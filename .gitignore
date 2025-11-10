@@ -1,0 +1,6 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/dependencies/whisper/models/ggml-medium.bin
+/dependencies/whisper/models/ggml-small.bin
