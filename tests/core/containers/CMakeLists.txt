@@ -15,6 +15,41 @@ else()
         ${CORE_INCLUDES}
         ${TEST_DETAILS_PATH}
     )
+    
+    # --- C++ standard (застосується до OBJECT target)
+    target_compile_features(CORE_MODULE_CONTAINERS_TESTS PUBLIC cxx_std_23)
+    
+    # --- Common compile definitions (передаються при компіляції об'єктів)
+    target_compile_definitions(CORE_MODULE_CONTAINERS_TESTS PUBLIC
+        $<$<CONFIG:Release>:NDEBUG>
+    )
+    
+    # --- Platform/compiler-specific compile options
+    if(MSVC)
+        target_compile_options(CORE_MODULE_CONTAINERS_TESTS PRIVATE
+            $<$<CONFIG:Release>:
+                /O2
+                /Ot
+                /Oi
+                /GL
+                /fp:fast
+            >
+        )
+    else()
+        target_compile_options(CORE_MODULE_CONTAINERS_TESTS PRIVATE
+            $<$<CONFIG:Release>:
+                -O3
+                -march=native
+                -mtune=native
+                -funroll-loops
+                -fstrict-aliasing
+                -ffast-math
+                -fno-exceptions
+                -fno-rtti
+            >
+        )
+    endif()
+
     target_link_libraries(CORE_MODULE_CONTAINERS_TESTS PUBLIC CORE_MODULE)
 
     if(TARGET CORE_MODULE_CONTAINERS_TESTS)

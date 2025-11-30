@@ -7,6 +7,28 @@
 namespace containers {
   namespace internal {
     using utility::unfancy;
+
+    struct no_allocator {};
+    struct inlined {};
+
+    template<typename Policy, typename = void>
+    struct get_allocator_type {
+      using type = no_allocator;
+    };
+
+    template<typename Policy>
+    struct get_allocator_type<Policy, std::void_t<typename Policy::allocator_type>> {
+      using type = typename Policy::allocator_type;
+    };
+
+    template<typename Policy, typename = void>
+    struct get_inlined_size : std::integral_constant<typename Policy::size_type, 0> {};
+
+    template<typename Policy>
+    struct get_inlined_size<Policy, std::void_t<typename Policy::inlined_size>> : Policy::inlined_size {};
+
+    struct empty_data {};
+
     template<typename Alloc>
     class construct_helper {
     public:
@@ -102,7 +124,7 @@ namespace containers {
           c.construct_one(std::move(*it));
         }
         c.release();
-        dest += count;
+        dest += end-first;
         return dest;
       }
     }
@@ -135,7 +157,7 @@ namespace containers {
           c.construct_one(*it);
         }
         c.release();
-        dest += count;
+        dest += end - first;
         return dest;
       }
     }

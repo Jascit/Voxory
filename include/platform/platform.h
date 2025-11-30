@@ -2,6 +2,7 @@
 
 #if defined(_WIN64)
   // Windows 64-bit
+#include <windows.h>
 #define WINDOWS
 #elif defined(__APPLE__) && defined(__MACH__)
 #include <TargetConditionals.h>
@@ -96,3 +97,6 @@ static inline void linux_abort_with_core() {
 #else
 #  define FORCE_INLINE inline
 #endif
+
+#define CONSTEXPR constexpr
+#define NODISCARD [[nodiscard]]

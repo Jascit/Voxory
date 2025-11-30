@@ -1,10 +1,9 @@
 #pragma once
 #include <type_traits>
-#include <iterator>
 #include <optional>
+#include <platform/platform.h>
 
 namespace type_traits {
-
   template<typename It>
   using iter_value_t = typename std::iterator_traits<It>::value_type;
   
@@ -63,6 +62,7 @@ namespace type_traits {
  
   template<typename T>
   struct trivial_traits {
+  public:
     using is_trivially_destructible = std::is_trivially_constructible<T>;
     using is_trivially_constructible = std::is_trivially_destructible<T>;
     using is_trivially_copyable = std::is_trivially_copyable<T>;
@@ -95,5 +95,11 @@ namespace type_traits {
    
   template<typename U>
   struct is_optional<std::optional<U>> : std::true_type {};
+  
+
+  template<typename T, typename...>
+  NODISCARD CONSTEXPR auto first_arg(T&& arg, ...) noexcept -> decltype(auto) {
+    return std::forward<T>(arg);
+  }
 
 } // namespace type_traits

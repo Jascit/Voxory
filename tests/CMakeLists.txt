@@ -39,6 +39,22 @@ add_executable (tests
   "${CMAKE_CURRENT_SOURCE_DIR}/test_framework/test_main.cpp"
 ) 
 
+if(MSVC)
+    target_link_options(tests PRIVATE
+        $<$<CONFIG:Release>:
+            /LTCG
+            /OPT:REF
+            /OPT:ICF
+        >
+    )
+else()
+    target_link_options(tests PRIVATE
+        $<$<CONFIG:Release>:-flto>
+    )
+endif()
+# Ensure PIC (useful for shared builds / linking into shared libs)
+set_target_properties(tests PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_link_libraries(tests PRIVATE
     ${TESTS_ALL_LIBRARIES_DYNAMIC}
 )
