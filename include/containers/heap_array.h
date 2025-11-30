@@ -26,6 +26,9 @@ namespace containers {
 
     template<typename Pointer, typename Alloc, typename... Args>
     inline constexpr bool IsNoexceptConstructRange_v = IsNoexceptConstructRange<Pointer, Alloc, Args...>;
+
+    struct move_tag{};
+    struct copy_tag{};
   }
   template<typename Policy>
   class heap_array {
@@ -231,6 +234,7 @@ namespace containers {
       }
     };
 
+    //TODO: add gemetric resize, not just exact size
     CONSTEXPR void new_buffer(size_type new_capacity) noexcept() {
       auto& data = pair_.second();
       auto& alloc = pair_.first();
@@ -253,7 +257,9 @@ namespace containers {
       guard.release();
     };
 
-    CONSTEXPR void new_buffer(size_type new_capacity, pointer src, size_type new_size) noexcept() {
+    // tag to select between copy and move
+    template<typename Tag>
+    CONSTEXPR void new_buffer(size_type new_capacity, pointer src, size_type new_size, Tag&&) noexcept() {
       auto& data = pair_.second();
       auto& alloc = pair_.first();
       auto& first = data.first;
@@ -261,62 +267,81 @@ namespace containers {
 
       pointer new_data = alloc.allocate(new_capacity);
       pointer new_last = new_data;
+
+      //guard, if exception occurs during move/copy: destroy new_data, leave old intact 
       internal::realloc_guard<allocator_type> guard(alloc, new_data, new_data + new_capacity);
+      if constexpr (std::is_same_v<detail::copy_tag, Tag>) {
+        new_last = internal::uninitialized_copy(src, src + new_size, new_data, alloc);
+      }
+      else
+      {
+        new_last = internal::uninitialized_move(src, src + new_size, new_data, alloc);
+      }
+      guard.release();
+
       if (first != nullptr)
       {
-        //guard, if exception occurs during move: destroy new_data, leave old intact
         destroy_range(first, last);
         deallocate_buffer();
-        new_last = internal::uninitialized_copy(src, src+new_size, new_data, alloc);
       }
-
       first = new_data;
       last = new_last;
       capacity_ = new_capacity;
-      guard.release();
+      
     };
 
-    NODISCARD CONSTEXPR void assign_copy(heap_array& o) noexcept(std::is_nothrow_copy_assignable_v<value_type>) {
-      auto& data  = pair_.second();
+    template<typename Tag>
+    CONSTEXPR void assign(heap_array& o, Tag&& t) noexcept() {
+      auto& data = pair_.second();
       auto& alloc = pair_.first();
 
       auto& first = data.first;
-      auto& last  = data.second;
-      auto& end   = first + capacity_;
-      
-      auto o_data  = o.pair_.second();
+      auto& last = data.second;
+
+      auto o_data = o.pair_.second();
       auto o_first = o_data.first;
-      auto o_last  = o_data.second;
-      auto o_end   = o_first + o.capacity_;
 
       size_type o_cap = o.capacity_;
-      size_type new_size = o.size_;
-      size_type size = last-first;//alive objects && default constructed 
-      
-      //allocate new buffer, copy construct all
-      if (new_size > capacity_)
-      {
-        new_buffer(o_cap, o_first, new_size);
+      size_type o_size = o.size_;
+      size_type size = static_cast<size_type>(last - first); // count of alive objects & default constructed 
+
+      // allocate new buffer, copy/move-construct all
+      if (o_size > capacity_) {
+        new_buffer(o_cap, o_first, o_size, t);
+        return;
       }
-      //copy assign within existing buffer, copy construct rest
-      else if (new_size > size)
-      {
-        size_type rest = new_size - size;
-        pointer dest = first;
-        for (; o_first < o_first + size; o_first++) {
-          *dest = *o_first;
-          dest++;
+
+      // copy/move-assign within existing buffer, copy-construct rest
+      if (o_size > size) {
+        size_type common = size;
+        size_type rest = o_size - size;
+        if constexpr (std::is_same_v<detail::copy_tag, Tag>) {
+          pointer mid = internal::copy_assign_n(o_first, common, first, alloc);
+          mid = internal::uninitialized_copy_n(o_first + common, rest, mid, alloc);
+          last = mid;
+        }else {
+          pointer mid = internal::move_assign_n(o_first, common, first, alloc);
+          mid = internal::uninitialized_move_n(o_first + common, rest, mid, alloc);
+          last = mid;
         }
-        internal::uninitialized_copy_n(o_first, rest, dest, alloc);
+        return;
       }
-      //copy assign within existing buffer, destroy rest
-      else {
-
+      // copy/move-assign within existing buffer, destroy rest
+      else
+      {
+        size_type common = o_size;    
+        size_type rest = size - o_size; 
+        if constexpr (std::is_same_v<detail::copy_tag, Tag>) {
+          pointer mid = internal::copy_assign_n(o_first, common, first, alloc);
+          destroy_range(mid, mid + rest);
+          last = mid;
+        }
+        else {
+          pointer mid = internal::move_assign_n(o_first, common, first, alloc);
+          destroy_range(mid, mid + rest);
+          last = mid;
+        }
       }
-    }
-
-    NODISCARD CONSTEXPR void assign_move(heap_array& o) noexcept(std::is_nothrow_assignable_construcluible_v<value_type>) {
-      
     }
     
   protected:

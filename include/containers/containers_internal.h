@@ -473,7 +473,7 @@ namespace containers {
       }
     }
     template<typename Alloc, typename FwdIt>
-    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer copy_assign_n(const FwdIt first, size_t count, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer move_assign_n(const FwdIt first, size_t count, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
       noexcept(type_traits::use_memmove_copy_construct_v<FwdIt> || std::is_nothrow_copy_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
