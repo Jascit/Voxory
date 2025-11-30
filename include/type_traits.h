@@ -96,10 +96,23 @@ namespace type_traits {
   template<typename U>
   struct is_optional<std::optional<U>> : std::true_type {};
   
-
   template<typename T, typename...>
   NODISCARD CONSTEXPR auto first_arg(T&& arg, ...) noexcept -> decltype(auto) {
     return std::forward<T>(arg);
   }
 
+  template<typename Alloc, typename Pointer, typename = void>
+  struct has_destroy : std::false_type {};
+
+  template<typename Alloc, typename Pointer>
+  struct has_destroy<
+    Alloc,
+    Pointer,
+    std::void_t<decltype(std::declval<Alloc&>().destroy(std::declval<Pointer>()))>
+  > : std::true_type {
+  };
+
+  template<typename Alloc, typename Pointer>
+  constexpr bool has_destroy_v = has_destroy<Alloc, Pointer>;
+  
 } // namespace type_traits

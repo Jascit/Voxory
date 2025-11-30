@@ -38,21 +38,71 @@ namespace containers {
       using pointer = typename allocator_traits::pointer;
       construct_helper(Alloc& alloc, pointer first) noexcept : alloc_(std::ref(alloc)), first_(first), current_(first) {};
       ~construct_helper() {
-        for (; first_ != current_; first_++)
-          allocator_traits::destroy(alloc_.get(), first_);
+        if constexpr (type_traits::has_destroy<allocator_type, pointer>::value)
+        {
+          alloc_.get().destroy(alloc_.get(), first_);
+        }
+        else {
+          std::destroy_at(first_);
+        }
       }
-      
+
       template<typename... Args>
-      _CONSTEXPR20 void construct_one(Args&&... args) noexcept(std::is_nothrow_constructible_v<value_type, Args...>) {
+      CONSTEXPR void construct_one(Args&&... args) noexcept(std::is_nothrow_constructible_v<value_type, Args...>) {
         allocator_traits::construct(alloc_.get(), current_, std::forward<Args>(args)...);
         current_++;
       }
 
-      _CONSTEXPR20 void release() noexcept {
+      CONSTEXPR void release() noexcept {
         first_ = current_;
       }
 
-      _NODISCARD _CONSTEXPR20 pointer current() noexcept {
+      NODISCARD CONSTEXPR pointer current() noexcept {
+        return current_;
+      }
+
+    private:
+      std::reference_wrapper<Alloc> alloc_;
+      pointer first_;
+      pointer current_;
+    };
+
+    template<typename Alloc>
+    class assign_helper {
+    public:
+      using allocator_type = Alloc;
+      using allocator_traits = std::allocator_traits<allocator_type>;
+      using value_type = typename allocator_traits::value_type;
+      using pointer = typename allocator_traits::pointer;
+      assign_helper(Alloc& alloc, pointer first) noexcept : alloc_(std::ref(alloc)), first_(first), current_(first) {};
+      ~assign_helper() {
+        for (; first_ != current_; first_++) {
+          if constexpr (type_traits::has_destroy<allocator_type, pointer>::value)
+          {
+            alloc_.get().destroy(alloc_.get(), first_);
+          }
+          else {
+            std::destroy_at(first_);
+          }
+        }
+      }
+
+
+      CONSTEXPR void assign_copy_one(value_type& val) noexcept(std::is_nothrow_copy_assignable_v<value_type>) {
+        *current_ = val;
+        current_++;
+      }
+
+      CONSTEXPR void assign_move_one(value_type& val) noexcept(std::is_nothrow_move_assignable_v<value_type>) {
+        *current_ = std::move(val);
+        current_++;
+      }
+
+      CONSTEXPR void release() noexcept {
+        first_ = current_;
+      }
+
+      NODISCARD CONSTEXPR pointer current() noexcept {
         return current_;
       }
 
@@ -80,24 +130,28 @@ namespace containers {
     };
 
     template<typename Wrapper>
-    _NODISCARD _CONSTEXPR20 auto unwrap(Wrapper&& wrap) noexcept -> decltype(auto) {
+    NODISCARD CONSTEXPR auto unwrap(Wrapper&& wrap) noexcept -> decltype(auto) {
       if constexpr (type_traits::is_reference_wrapper<Wrapper>::value)
       {
         return std::addressof(wrap.get());
-      } else if constexpr (std::is_pointer<Wrapper>::value) {
+      }
+      else if constexpr (std::is_pointer<Wrapper>::value) {
         return wrap;
-      } else if constexpr(type_traits::has_deref<Wrapper>::value) {
+      }
+      else if constexpr (type_traits::has_deref<Wrapper>::value) {
         return std::addressof(*wrap);
-      }else if constexpr (type_traits::is_optional<Wrapper>::value) {
+      }
+      else if constexpr (type_traits::is_optional<Wrapper>::value) {
         return std::addressof(*wrap);
-      } else {
+      }
+      else {
         static_assert(type_traits::always_false<Wrapper>, "unwrap: unsupported wrapper type");
       }
     }
     // TODO: potential issues with custom allocators (construct/destroy).
     // Need to review the noexcept logic or switch to default construction.
     template<typename Alloc, typename FwdIt>
-    _NODISCARD _CONSTEXPR20 typename std::allocator_traits<Alloc>::pointer uninitialized_move(const FwdIt first, const FwdIt end, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer uninitialized_move(const FwdIt first, const FwdIt end, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
       noexcept(type_traits::use_memmove_copy_construct_v<FwdIt> || std::is_nothrow_move_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
@@ -124,13 +178,13 @@ namespace containers {
           c.construct_one(std::move(*it));
         }
         c.release();
-        dest += end-first;
+        dest += end - first;
         return dest;
       }
     }
 
     template<typename Alloc, typename FwdIt>
-    _NODISCARD _CONSTEXPR20 typename std::allocator_traits<Alloc>::pointer uninitialized_copy(const FwdIt first, const FwdIt end, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer uninitialized_copy(const FwdIt first, const FwdIt end, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
       noexcept(type_traits::use_memmove_copy_construct_v<FwdIt> || std::is_nothrow_copy_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
@@ -163,20 +217,20 @@ namespace containers {
     }
     //works only with trivial types
     template<typename T>
-    _CONSTEXPR20 bool is_zeroed(const T& val) {
+    CONSTEXPR bool is_zeroed(const T& val) {
       constexpr T zero{};
       return std::memcmp(&val, &zero, sizeof(T));
     }
 
     template<typename Alloc, typename FwdIt>
-    _NODISCARD _CONSTEXPR20 typename std::allocator_traits<Alloc>::pointer uninitialized_fill(const FwdIt first, const FwdIt end, const typename std::allocator_traits<Alloc>::value_type& val, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer uninitialized_fill(const FwdIt first, const FwdIt end, const typename std::allocator_traits<Alloc>::value_type& val, Alloc& alloc)
       noexcept(type_traits::use_memmove_copy_construct_v<FwdIt> || std::is_nothrow_copy_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
       using it_value = typename std::iterator_traits<FwdIt>::value_type;
       using pointer = typename std::allocator_traits<Alloc>::pointer;
       static_assert(std::is_same_v<it_value, value_type>, "Iterator value_type must match allocator value_type");
-     
+
       if constexpr (type_traits::use_memset_value_construct_v<FwdIt>) {
         // assume contiguous / pointer-like: get raw pointers
         pointer src_raw = unfancy(unwrap(first));
@@ -207,7 +261,7 @@ namespace containers {
     }
 
     template<typename Alloc, typename FwdIt>
-    _NODISCARD _CONSTEXPR20 typename std::allocator_traits<Alloc>::pointer uninitialized_default_construct(const FwdIt first, const FwdIt end, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer uninitialized_default_construct(const FwdIt first, const FwdIt end, Alloc& alloc)
       noexcept(type_traits::use_memset_value_construct_v<FwdIt> || std::is_nothrow_default_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
@@ -236,9 +290,9 @@ namespace containers {
         return c.current();
       }
     }
- 
+
     template<typename Alloc, typename FwdIt>
-    _NODISCARD _CONSTEXPR20 typename std::allocator_traits<Alloc>::pointer uninitialized_copy_n(const FwdIt first, size_t count, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer uninitialized_copy_n(const FwdIt first, size_t count, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
       noexcept(type_traits::use_memmove_copy_construct_v<FwdIt> || std::is_nothrow_copy_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
@@ -259,7 +313,7 @@ namespace containers {
         // generic safe path for forward iterators
         construct_helper<Alloc> c(alloc, unfancy(dest));
         pointer it = unfancy(unwrap(first));
-        pointer end = it+count;
+        pointer end = it + count;
         for (; it != end; ++it) {
           c.construct_one(*it);
         }
@@ -269,7 +323,7 @@ namespace containers {
       }
     }
     template<typename Alloc, typename FwdIt>
-    _NODISCARD _CONSTEXPR20 typename std::allocator_traits<Alloc>::pointer uninitialized_move_n(const FwdIt first, size_t count, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer uninitialized_move_n(const FwdIt first, size_t count, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
       noexcept(type_traits::use_memmove_copy_construct_v<FwdIt> || std::is_nothrow_move_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
@@ -290,7 +344,7 @@ namespace containers {
         // generic safe path for forward iterators
         construct_helper<Alloc> c(alloc, unfancy(dest));
         pointer it = unfancy(unwrap(first));
-        pointer end = it+count;
+        pointer end = it + count;
         for (; it != end; ++it) {
           c.construct_one(std::move(*it));
         }
@@ -301,7 +355,7 @@ namespace containers {
     }
 
     template<typename Alloc, typename FwdIt>
-    _NODISCARD _CONSTEXPR20 typename std::allocator_traits<Alloc>::pointer uninitialized_fill_n(const FwdIt first, size_t count, const typename std::allocator_traits<Alloc>::value_type& val, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer uninitialized_fill_n(const FwdIt first, size_t count, const typename std::allocator_traits<Alloc>::value_type& val, Alloc& alloc)
       noexcept(type_traits::use_memset_value_construct_v<FwdIt> || std::is_nothrow_copy_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
@@ -327,7 +381,7 @@ namespace containers {
         // generic safe path for forward iterators
         construct_helper<Alloc> c(alloc, unfancy(unwrap(first)));
         pointer it = unfancy(unwrap(first));
-        pointer end = it+count;
+        pointer end = it + count;
         for (; it != end; ++it) {
           c.construct_one(val);
         }
@@ -335,9 +389,9 @@ namespace containers {
         return c.current();
       }
     }
-  
+
     template<typename Alloc, typename FwdIt, typename... Args>
-    _NODISCARD _CONSTEXPR20 typename std::allocator_traits<Alloc>::pointer uninitialized_default_construct_n(const FwdIt first, size_t count, Alloc& alloc)
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer uninitialized_default_construct_n(const FwdIt first, size_t count, Alloc& alloc)
       noexcept(type_traits::use_memset_value_construct_v<FwdIt> || std::is_nothrow_default_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
     {
       using value_type = typename std::allocator_traits<Alloc>::value_type;
@@ -356,12 +410,97 @@ namespace containers {
         // generic safe path for forward iterators
         construct_helper<Alloc> c(alloc, unfancy(unwrap(first)));
         pointer it = unfancy(unwrap(first));
-        pointer end = it+count;
+        pointer end = it + count;
         for (; it != end; ++it) {
           c.construct_one();
         }
         c.release();
         return c.current();
+      }
+    }
+    
+    template<typename Alloc>
+    class realloc_guard {
+    public:
+      using allocator_type = Alloc;
+      using allocator_traits = std::allocator_traits<allocator_type>;
+      using pointer = std::allocator_traits<Alloc>::pointer;
+      realloc_guard(allocator_type& alloc, pointer first, pointer end) noexcept : alloc_(alloc), first_(first), end_(end) {};
+
+      ~realloc_guard() {
+        alloc_.get().deallocate(first_, last_ - first_)
+      }
+
+      CONSTEXPR void release() noexcept {
+        first_ = last_;
+      };
+
+    private:
+      std::reference_wrapper<Alloc> alloc_;
+      pointer first_;
+      pointer end_;
+    };
+
+    template<typename Alloc, typename FwdIt>
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer copy_assign_n(const FwdIt first, size_t count, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
+      noexcept(type_traits::use_memmove_copy_construct_v<FwdIt> || std::is_nothrow_copy_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
+    {
+      using value_type = typename std::allocator_traits<Alloc>::value_type;
+      using it_value = typename std::iterator_traits<FwdIt>::value_type;
+      using pointer = typename std::allocator_traits<Alloc>::pointer;
+      static_assert(std::is_same_v<it_value, value_type>, "Iterator value_type must match allocator value_type");
+
+      if constexpr (type_traits::use_memmove_copy_construct_v<FwdIt>) {
+        // assume contiguous / pointer-like: get raw pointers
+        pointer src_raw = unfancy(unwrap(first));
+        pointer src_end = src_raw + count;
+        size_t bytes = count * sizeof(value_type);
+        std::memmove(unfancy(dest), src_raw, bytes);
+        dest += count;
+        return dest;
+      }
+      else {
+        // generic safe path for forward iterators
+        assign_helper<Alloc> ah(alloc, unfancy(dest));
+        pointer it = unfancy(unwrap(first));
+        pointer end = it + count;
+        for (; it != end; ++it) {
+          ah.assign_copy_one(*it);
+        }
+        ah.release();
+        dest += count;
+        return dest;
+      }
+    }
+    template<typename Alloc, typename FwdIt>
+    NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer copy_assign_n(const FwdIt first, size_t count, typename std::allocator_traits<Alloc>::pointer dest, Alloc& alloc)
+      noexcept(type_traits::use_memmove_copy_construct_v<FwdIt> || std::is_nothrow_copy_constructible_v<typename std::allocator_traits<Alloc>::value_type>)
+    {
+      using value_type = typename std::allocator_traits<Alloc>::value_type;
+      using it_value = typename std::iterator_traits<FwdIt>::value_type;
+      using pointer = typename std::allocator_traits<Alloc>::pointer;
+      static_assert(std::is_same_v<it_value, value_type>, "Iterator value_type must match allocator value_type");
+
+      if constexpr (type_traits::use_memmove_copy_construct_v<FwdIt>) {
+        // assume contiguous / pointer-like: get raw pointers
+        pointer src_raw = unfancy(unwrap(first));
+        pointer src_end = src_raw + count;
+        size_t bytes = count * sizeof(value_type);
+        std::memmove(unfancy(dest), src_raw, bytes);
+        dest += count;
+        return dest;
+      }
+      else {
+        // generic safe path for forward iterators
+        assign_helper<Alloc> ah(alloc, unfancy(dest));
+        pointer it = unfancy(unwrap(first));
+        pointer end = it + count;
+        for (; it != end; ++it) {
+          ah.assign_move_one(*it);
+        }
+        ah.release();
+        dest += count;
+        return dest;
       }
     }
   }
