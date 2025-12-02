@@ -269,10 +269,10 @@ namespace containers {
     CONSTEXPR static_array& operator=(const detail::static_array_base<value_type>& o) {
       if (this == &o) return *this;
       if (o.capacity() > capacity_) {
-        pair_.second = assign_copy_n(o.data(), o.data() + capacity_, pair_.first);
+        pair_.second = copy_assign(o.data(), o.data() + capacity_, pair_.first);
       }
       else {
-        pointer new_last = assign_copy_n(o.data(), o.data() + capacity_, pair_.first);
+        pointer new_last = copy_assign(o.data(), o.data() + capacity_, pair_.first);
         destroy_range(new_last, pair_.second);
         pair_.second = new_last;
         pair_.second = std::uninitialized_default_construct_n(pair_.second, capacity_-(pair_.second-pair_.first));
@@ -283,10 +283,10 @@ namespace containers {
     CONSTEXPR static_array& operator=(detail::static_array_base<value_type>&& o) {
       if (this == &o) return *this;
       if (o.capacity() > capacity_) {
-        pair_.second = assign_move_n(o.data(), o.data() + capacity_, pair_.first);
+        pair_.second = move_assign(o.data(), o.data()+capacity_, pair_.first);
       }
       else {
-        pointer new_last = assign_move_n(o.data(), o.data() + capacity_, pair_.first);
+        pointer new_last = move_assign(o.data(), o.data() + capacity_, pair_.first);
         destroy_range(new_last, pair_.second);
         pair_.second = new_last;
         pair_.second = std::uninitialized_default_construct_n(pair_.second, capacity_ - (pair_.second - pair_.first));
@@ -347,15 +347,7 @@ namespace containers {
         }
       }
     }
-
-    CONSTEXPR void destroy_range(pointer first, pointer end) noexcept(trivial_traits::is_trivially_destructible::value || std::is_nothrow_destructible_v<value_type>) {
-      if constexpr (!trivial_traits::is_trivially_destructible::value)
-      {
-        std::destroy_n(first, static_cast<size_t>(end - first));
-      }
-    };
-
-    CONSTEXPR pointer assign_move_n(pointer first, pointer last, pointer dest) noexcept(std::is_nothrow_move_assignable_v<value_type>){
+    CONSTEXPR pointer move_assign(pointer first, pointer last, pointer dest) noexcept(std::is_nothrow_move_assignable_v<value_type>) {
       if (type_traits::use_memmove_copy_construct_v<pointer>)
       {
         std::size_t count = static_cast<std::size_t>(last - first);
@@ -374,7 +366,7 @@ namespace containers {
       }
     }
 
-    CONSTEXPR pointer assign_copy_n(pointer first, pointer last, pointer dest) noexcept(std::is_nothrow_move_assignable_v<value_type>){
+    CONSTEXPR pointer copy_assign(pointer first, pointer last, pointer dest) noexcept(std::is_nothrow_move_assignable_v<value_type>) {
       if (type_traits::use_memmove_copy_construct_v<pointer>)
       {
         std::size_t count = static_cast<std::size_t>(last - first);
@@ -392,6 +384,12 @@ namespace containers {
         return dest;
       }
     }
+    CONSTEXPR void destroy_range(pointer first, pointer end) noexcept(trivial_traits::is_trivially_destructible::value || std::is_nothrow_destructible_v<value_type>) {
+      if constexpr (!trivial_traits::is_trivially_destructible::value)
+      {
+        std::destroy_n(first, static_cast<size_t>(end - first));
+      }
+    };
 
     CONSTEXPR void cleanup() noexcept(noexcept(destroy_range(std::declval<pointer>(), std::declval<pointer>()))) {
       auto& first = pair_.first;
