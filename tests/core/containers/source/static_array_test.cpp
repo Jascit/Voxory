@@ -1,6 +1,6 @@
 // static_array_tests.cpp
 #include <tests_details.h>
-#include <containers/static_array.h> // <-- підкоригуй шлях, якщо потрібно
+#include <impl/containers/static_array.h> // <-- підкоригуй шлях, якщо потрібно
 #include <iostream>
 #include <string>
 #include <memory>
@@ -179,6 +179,24 @@ NOYX_TEST(static_array_test, unit_test) {
   time_and_run(static_array_test_zero_size, "zero_size");
   time_and_run(static_array_test_swap, "swap");
   time_and_run(static_array_test_stress_alloc_dealloc, "stress_alloc_dealloc");
-
+  class Singleton {
+  public:
+    void do_shit_brotha() {
+      std::cout << "I ain't doing sheeet";
+    }
+  public:
+    Singleton(const Singleton&) = delete;
+    Singleton& operator=(const Singleton&) = delete;
+    static Singleton& instance() {
+      static Singleton inst;
+      return inst;
+    }
+  private:
+    Singleton() = default;
+    ~Singleton() = default;
+  };
+  int main() {
+    Singleton::instance.do_shit_brotha();
+  }
   return;
 }

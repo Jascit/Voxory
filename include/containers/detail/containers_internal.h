@@ -424,21 +424,24 @@ namespace containers {
     public:
       using allocator_type = Alloc;
       using allocator_traits = std::allocator_traits<allocator_type>;
-      using pointer = std::allocator_traits<Alloc>::pointer;
-      realloc_guard(allocator_type& alloc, pointer first, pointer end) noexcept : alloc_(alloc), first_(first), end_(end) {};
+      using pointer = typename allocator_traits::pointer;
+      realloc_guard(allocator_type& alloc, pointer first, size_t size) noexcept
+        : alloc_(std::ref(alloc)), first_(first), size_(size) {}
 
       ~realloc_guard() {
-        alloc_.get().deallocate(first_, last_ - first_)
+        if (first_ != nullptr) {
+          alloc_.get().deallocate(first_, size_);
+        }
       }
 
       CONSTEXPR void release() noexcept {
-        first_ = last_;
+        first_ = nullptr;
       };
 
     private:
       std::reference_wrapper<Alloc> alloc_;
       pointer first_;
-      pointer end_;
+      size_t size_;
     };
 
     template<typename Alloc, typename FwdIt>

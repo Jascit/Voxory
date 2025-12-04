@@ -6,8 +6,9 @@
 #include <string>
 #include <windows.h>
 #include <iostream>
+#include <vector>
 #include <platform/VirtualAlloc.h>
-
+std::_Vector_iterator<std::vector<int>>;
 // ---------- Lock-free SPSC ring (chunk-aligned) ----------
 class ChunkRing {
 public:

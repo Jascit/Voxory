@@ -2,7 +2,7 @@
 #define NOMINMAX
 #include <utility.h>
 #include <type_traits.h>
-#include <containers/containers_internal.h>
+#include <containers/detail/containers_internal.h>
 #include <platform/platform.h>
 #include <memory>
 #include <xmemory>

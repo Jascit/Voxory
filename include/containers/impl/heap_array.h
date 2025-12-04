@@ -4,8 +4,7 @@
 #include <type_traits.h>
 #include <stdexcept>
 #include <platform/platform.h>
-#include <containers/ring_buffer.h>
-#include <containers/containers_internal.h>
+#include <containers/detail/containers_internal.h>
 
 namespace containers {
   namespace detail {
@@ -181,7 +180,10 @@ namespace containers {
     };
 
     value_type& operator[](size_t idx) noexcept {
+#ifdef DEBUG
       ASSERT_ABORT(idx < size(), "heap_array index out of bounds");
+#endif // DEBUG
+
       return pair_.second().first[idx];
     };
     
@@ -218,13 +220,27 @@ namespace containers {
       cleanup();
     };
     
-    CONSTEXPR void resize(size_type new_size) noexcept {
-      resize_buffer(new_size);
+    CONSTEXPR void resize(size_type size) noexcept(noexcept(resize_buffer(std::declval<size_type>()))) {
+      resize_buffer(size);
     };
 
-    CONSTEXPR void reserve() noexcept {};
-    CONSTEXPR void insert() noexcept {};
-    NODISCARD CONSTEXPR pointer at(size_t index) {};
+    CONSTEXPR void reserve(size_t size) noexcept(noexcept(reallocate(std::declval<size_type>()))) {
+      if (size>capacity_)
+      {
+        reallocate(size);
+      }
+    };
+
+    NODISCARD CONSTEXPR pointer at(size_t index) {
+      if (index >= size()) throw std::out_of_range("index out of range");
+      return std::addressof(pair_.second().first[index]);
+    }
+
+    NODISCARD CONSTEXPR const pointer at(size_t index) const {
+      if (index >= size()) throw std::out_of_range("index out of range");
+      return std::addressof(pair_.second().first[index]);
+    }
+
     NODISCARD CONSTEXPR iterator begin() noexcept {
       return iterator(pair_.second().first);
     };
@@ -250,7 +266,7 @@ namespace containers {
     };
 
   private:
-    CONSTEXPR void cleanup_and_reserve_with_grow() {
+    CONSTEXPR void cleanup_and_reserve_with_grow() noexcept() {
       auto& data = pair_.second();
       auto& first = data.first;
       auto& last = data.second;
@@ -260,14 +276,11 @@ namespace containers {
       {
         destroy_range(first, last);
         deallocate_buffer();
-        first = nullptr;
-        last = nullptr;
-        capacity_ = 0;
       }
       allocate_buffer(new_capacity);
     };
 
-    NODISCARD CONSTEXPR pointer reallocate(size_type new_capacity) {
+    NODISCARD CONSTEXPR pointer reallocate(size_type new_capacity) noexcept() {
       auto& data = pair_.second();
       auto& alloc = get_allocator();
       auto& first = data.first;
@@ -275,7 +288,7 @@ namespace containers {
 
       pointer new_data = alloc.allocate(new_capacity);
       pointer new_last = new_data;
-      internal::realloc_guard<allocator_type> guard(alloc, new_data, new_data + new_capacity);
+      internal::realloc_guard<allocator_type> guard(alloc, new_data, new_capacity);
       if (first != nullptr)
       {
         //guard, if exception occurs during move: destroy new_data, leave old intact
@@ -296,9 +309,49 @@ namespace containers {
       capacity_ = new_capacity;
     };
 
+    CONSTEXPR void resize_buffer(size_type new_capacity) noexcept() {
+      if (new_capacity == capacity_) return;
+
+      auto& data = pair_.second();
+      auto& alloc = get_allocator();
+      auto& first = data.first;
+      auto& last = data.second;
+
+      if (new_capacity > capacity_) {
+        reallocate(new_capacity);
+        return;
+      }
+      size_type to_move = std::min(size(), new_capacity);
+      pointer new_data = alloc.allocate(new_capacity);
+      pointer new_last = new_data;
+
+      internal::realloc_guard<allocator_type> guard(alloc, new_data, new_capacity);
+      if (first != nullptr)
+      {
+        //guard, if exception occurs during move/copy: destroy new_data, leave old intact
+        if constexpr (noexcept(internal::uninitialized_move(std::declval<pointer>(), std::declval<pointer>(), std::declval<pointer>(), std::declval<allocator_type&>())))
+        {
+          new_last = internal::uninitialized_move(first, first + to_move, new_data, alloc);
+        }
+        else
+        {
+          new_last = internal::uninitialized_copy(first, first + to_move, new_data, alloc);
+        }
+        destroy_range(first, last);
+        deallocate_buffer();
+      }
+
+      guard.release();
+
+      first = new_data;
+      last = new_last;
+      capacity_ = new_capacity;
+      return;
+    };
+
     // tag to select between copy and move
     template<typename Tag>
-    CONSTEXPR void clean_and_create_buffer_src(size_type new_capacity, pointer src, size_type new_size, Tag&&) {
+    CONSTEXPR void clean_and_create_buffer_src(size_type new_capacity, pointer src, size_type new_size, Tag&&) noexcept() {
       auto& data = pair_.second();
       auto& alloc = get_allocator();
       auto& first = data.first;
@@ -308,7 +361,7 @@ namespace containers {
       pointer new_last = new_data;
 
       //guard, if exception occurs during move/copy: destroy new_data, leave old intact 
-      internal::realloc_guard<allocator_type> guard(alloc, new_data, new_data + new_capacity);
+      internal::realloc_guard<allocator_type> guard(alloc, new_data, new_capacity);
       if constexpr (std::is_same_v<detail::copy_tag, Tag>) {
         new_last = internal::uninitialized_copy(src, src + new_size, new_data, alloc);
       }
@@ -329,46 +382,6 @@ namespace containers {
 
     };
 
-    CONSTEXPR void resize_buffer(size_type new_capacity) noexcept() {
-      if (new_capacity == capacity_) return;
-      
-      auto& data = pair_.second();
-      auto& alloc = get_allocator();
-      auto& first = data.first;
-      auto& last = data.second;
-
-      if (new_capacity > capacity_) {
-        reallocate(new_capacity);
-        return;
-      }
-      size_type to_move = std::min(size(), new_capacity);
-      pointer new_data = alloc.allocate(new_capacity);
-      pointer new_last = new_data;
-
-      internal::realloc_guard<allocator_type> guard(alloc, new_data, new_data + new_capacity);
-      if (first != nullptr)
-      {
-        //guard, if exception occurs during move: destroy new_data, leave old intact
-        if constexpr (noexcept(internal::uninitialized_move(std::declval<pointer>(), std::declval<pointer>(), std::declval<pointer>(), std::declval<allocator_type&>())))
-        {
-          new_last = internal::uninitialized_move(first, first+to_move, new_data, alloc);
-        }
-        else
-        {
-          new_last = internal::uninitialized_copy(first, first + to_move, new_data, alloc);
-        }
-        destroy_range(first, last);
-        deallocate_buffer();
-      }
-      
-      guard.release();
-
-      first = new_data;
-      last = new_last;
-      capacity_ = new_capacity;
-      return;
-    };
-
     CONSTEXPR void cleanup() noexcept {
       auto& data = pair_.second();
       auto& first = data.first;
@@ -378,9 +391,6 @@ namespace containers {
       {
         destroy_range(first, last);
         deallocate_buffer();
-        first = nullptr;
-        last = nullptr;
-        capacity_ = 0;
       }
     };
 
@@ -406,13 +416,17 @@ namespace containers {
       allocate_buffer(n);
     };
 
-    CONSTEXPR void deallocate_buffer() noexcept {
+    CONSTEXPR void deallocate_buffer() noexcept(noexcept(std::declval<allocator_type&>().deallocate(std::declval<pointer>(), std::declval<size_type>()))) {
       auto& alloc = get_allocator();
       auto& data  = pair_.second();
-      alloc.deallocate(data.first, capacity_);
+      auto& first  = data.first;
+      auto& last = data.second;
+      alloc.deallocate(first, capacity_);
+      first = nullptr;
+      last = nullptr;
+      capacity_ = 0;
     };
 
-    //TODO: check on existing of destroy, use default_destruct
     CONSTEXPR void destroy_range(pointer first, pointer end) noexcept {
       if constexpr (!trivial_traits::is_trivially_destructible::value) {
         auto& alloc = get_allocator();

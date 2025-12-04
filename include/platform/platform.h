@@ -100,3 +100,65 @@ static inline void linux_abort_with_core() {
 
 #define CONSTEXPR constexpr
 #define NODISCARD [[nodiscard]]
+
+#if defined(FORCE_DISABLE_DEBUG)
+#  if defined(DEBUG)           // скасувати локальні дефайни
+#    undef DEBUG
+#  endif
+#  if defined(DEBUG_ITERATOR)
+#    undef DEBUG_ITERATOR
+#  endif
+#elif defined(FORCE_ENABLE_DEBUG)
+#  if !defined(DEBUG)
+#    define DEBUG
+#  endif
+#  if !defined(DEBUG_ITERATOR)
+#    define DEBUG_ITERATOR
+#  endif
+#endif
+
+#if !defined(NDEBUG) && !defined(DEBUG) && !defined(FORCE_DISABLE_DEBUG)
+#  define DEBUG
+#endif
+
+#if defined(_MSC_VER)
+#  if defined(_DEBUG) && !defined(FORCE_DISABLE_DEBUG)
+#    if !defined(DEBUG)
+#      define DEBUG
+#    endif
+#  endif
+#  if !defined(DEBUG_ITERATORS)
+#    define DEBUG_ITERATORS
+#  endif
+#endif // _MSC_VER
+
+#if defined(__GLIBCXX__) || defined(__GLIBCXX_DEBUG)
+#  if defined(_GLIBCXX_DEBUG) && !defined(FORCE_DISABLE_DEBUG)
+#    if !defined(DEBUG)
+#      define DEBUG
+#    endif
+#    if !defined(DEBUG_ITERATOR)
+#      define DEBUG_ITERATOR
+#    endif
+#  endif
+#endif
+
+#if defined(_LIBCPP_VERSION) || defined(__LIBCPP__)
+
+#  if defined(_LIBCPP_DEBUG) && (_LIBCPP_DEBUG > 0) && !defined(FORCE_DISABLE_DEBUG)
+#    if !defined(DEBUG)
+#      define DEBUG
+#    endif
+#    if !defined(DEBUG_ITERATOR)
+#      define DEBUG_ITERATOR
+#    endif
+#  endif
+#endif
+
+#if defined(DEBUG_ITERATOR)
+#  pragma message("DEBUG_ITERATOR is ON (iterator debug checks enabled). Performance may be affected.")
+#endif
+
+#if defined(DEBUG)
+#  pragma message("DEBUG is ON")
+#endif
