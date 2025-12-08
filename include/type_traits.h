@@ -113,6 +113,6 @@ namespace type_traits {
   };
 
   template<typename Alloc, typename Pointer>
-  constexpr bool has_destroy_v = has_destroy<Alloc, Pointer>;
+  constexpr bool has_destroy_v = has_destroy<Alloc, Pointer>::value;
   
 } // namespace type_traits

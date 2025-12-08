@@ -47,10 +47,16 @@ namespace voxory
         ~construct_helper() {
           if constexpr (type_traits::has_destroy<allocator_type, pointer>::value)
           {
-            alloc_.get().destroy(alloc_.get(), first_);
+            for (; first_ < current_; first_++)
+            {
+              alloc_.get().destroy(first_);
+            }
           }
           else {
-            std::destroy_at(first_);
+            for (; first_ < current_; first_++)
+            {
+              std::destroy_at(first_);
+            }
           }
         }
 

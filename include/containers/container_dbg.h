@@ -231,6 +231,30 @@ namespace voxory {
             --size_;
           }
 
+          CONSTEXPR void pop_at(node* loc) {
+            if (!loc) return;
+
+            // перепідключаємо сусідів
+            if (loc->last_) loc->last_->next_ = loc->next_;
+            else {
+              pair_.second_.first = loc->next_;
+              if (loc->next_) {
+                loc->next_->last_ = nullptr;
+              }
+            }// якщо видаляємо голову
+
+            if (loc->next_) loc->next_->last_ = loc->last_;
+            else {
+              pair_.second_.second = loc->last_; // якщо видаляємо хвіст
+              if (loc->last_) {
+                loc->last_->next_ = nullptr;
+              }
+            }
+
+            _destroy_node(loc);
+            --size_;
+          }
+
           CONSTEXPR void clear() noexcept {
             node* cur = pair_.second_.first;
             while (cur) {
@@ -241,6 +265,7 @@ namespace voxory {
             pair_.second_.first = pair_.second_.second = nullptr;
             size_ = 0;
           }
+
           CONSTEXPR node* data() {
             return pair_.second_.first;
           }
@@ -258,17 +283,11 @@ namespace voxory {
 
         class container_base_dbg {
         public:
-          void release_proxy() noexcept {
-            std::lock_guard<multithreading::spin_lock> guard(sl_);
-            for (auto& elem : list_)
-              elem->proxy_ = nullptr;
-            list_.clear();
-          }
+          void release_proxy() noexcept;
 
           list list_;
           multithreading::spin_lock sl_;
         };
-
 
         class iterator_base_dbg {
         public:
@@ -286,21 +305,27 @@ namespace voxory {
           CONSTEXPR void release_on_destroy() {
             if (!proxy_) return;
             auto nonconst_container = const_cast<container_base_dbg*>(container_);
-            std::lock_guard<multithreading::spin_lock> guard(nonconst_container->sl_);
-
-            if (proxy_->last_) proxy_->last_->next_ = proxy_->next_;
-            if (proxy_->next_) proxy_->next_->last_ = proxy_->last_;
-            nonconst_container->list_._destroy_node(proxy_);
+            nonconst_container->sl_.lock();
+            nonconst_container->list_.pop_at(proxy_);
             proxy_ = nullptr;
+            nonconst_container->sl_.unlock();
           }
 
         private:
           void register_to_container(const container_base_dbg* container) {
             auto nonconst_container = const_cast<container_base_dbg*>(container);
-            std::lock_guard<multithreading::spin_lock> guard(nonconst_container->sl_);
+            nonconst_container->sl_.lock();
             proxy_ = nonconst_container->list_.push_back(const_cast<iterator_base_dbg*>(this));
+            nonconst_container->sl_.unlock();
           }
         };
+        
+        void container_base_dbg::release_proxy() noexcept {
+          std::lock_guard<multithreading::spin_lock> guard(sl_);
+          for (auto& elem : list_)
+            elem->proxy_ = nullptr;
+          list_.clear();
+         }
 
         class iterator_base_rls {
         public:

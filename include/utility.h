@@ -100,7 +100,7 @@ namespace utility {
     }
 
     constexpr T1& first() noexcept { return static_cast<T1&>(*this); }
-    constexpr const T1& first() const noexcept { return static…_cast<T1 const&>(*this); }
+    constexpr const T1& first() const noexcept { return static_cast<T1 const&>(*this); }
   };
 
   template<typename Alloc, typename FirstIt, typename SecondIt>

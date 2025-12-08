@@ -1,6 +1,6 @@
 // static_array_tests.cpp
 #include <tests_details.h>
-#include <impl/containers/static_array.h> // <-- підкоригуй шлях, якщо потрібно
+#include <containers/impl/static_array.h>
 #include <iostream>
 #include <string>
 #include <memory>
@@ -8,7 +8,7 @@
 #include <iomanip>
 #include <chrono>
 
-using containers::static_array;
+using voxory::containers::static_array;
 
 // Test 1: basic construct, capacity, data, operator[], begin/end
 void static_array_test_basic_int_behavior() {
@@ -44,7 +44,7 @@ void static_array_test_copy_constructor_deep_strings() {
   for (size_t i = 0; i < N; ++i) src[(static_array<std::string, N>::size_type)i] = "s" + std::to_string(i);
 
   // use base class copy-constructor: static_array(const detail::static_array_base<T>&)
-  const containers::detail::static_array_base<std::string>& base_ref = reinterpret_cast<const containers::detail::static_array_base<std::string>&>(src);
+  const voxory::containers::detail::static_array_base<std::string>&base_ref = reinterpret_cast<const voxory::containers::detail::static_array_base<std::string>&>(src);
   static_array<std::string, N> dst(base_ref);
 
   // deep copy: modifying dst must not change src
@@ -60,7 +60,7 @@ void static_array_test_copy_assignment() {
   for (size_t i = 0; i < N; ++i) a[(static_array<int, N>::size_type)i] = (int)(10 + i);
 
   static_array<int, N> b;
-  const containers::detail::static_array_base<int>& base_ref = reinterpret_cast<const containers::detail::static_array_base<int>&>(a);
+  const voxory::containers::detail::static_array_base<int>&base_ref = reinterpret_cast<const voxory::containers::detail::static_array_base<int>&>(a);
   b = base_ref;
 
   // modifying b must not change a (deep copy)
@@ -76,7 +76,7 @@ void static_array_test_move_semantics_strings() {
   for (size_t i = 0; i < N; ++i) a[(static_array<std::string, N>::size_type)i] = "v" + std::to_string(i);
 
   // move-construct from base rvalue
-  containers::detail::static_array_base<std::string>&& rbase = reinterpret_cast<containers::detail::static_array_base<std::string>&&>(a);
+  voxory::containers::detail::static_array_base<std::string>&& rbase = reinterpret_cast<voxory::containers::detail::static_array_base<std::string>&&>(a);
   static_array<std::string, N> moved(std::move(rbase));
 
   // moved should contain the original values (though originals may be in moved-from state)
@@ -87,7 +87,7 @@ void static_array_test_move_semantics_strings() {
   // move-assignment: create another and move-assign
   static_array<std::string, N> x;
   for (size_t i = 0; i < N; ++i) x[(static_array<std::string, N>::size_type)i] = "X" + std::to_string(i);
-  containers::detail::static_array_base<std::string>&& rbase2 = reinterpret_cast<containers::detail::static_array_base<std::string>&&>(moved);
+  voxory::containers::detail::static_array_base<std::string>&& rbase2 = reinterpret_cast<voxory::containers::detail::static_array_base<std::string>&&>(moved);
   x = std::move(rbase2);
 
   for (size_t i = 0; i < N; ++i) {
@@ -179,24 +179,6 @@ NOYX_TEST(static_array_test, unit_test) {
   time_and_run(static_array_test_zero_size, "zero_size");
   time_and_run(static_array_test_swap, "swap");
   time_and_run(static_array_test_stress_alloc_dealloc, "stress_alloc_dealloc");
-  class Singleton {
-  public:
-    void do_shit_brotha() {
-      std::cout << "I ain't doing sheeet";
-    }
-  public:
-    Singleton(const Singleton&) = delete;
-    Singleton& operator=(const Singleton&) = delete;
-    static Singleton& instance() {
-      static Singleton inst;
-      return inst;
-    }
-  private:
-    Singleton() = default;
-    ~Singleton() = default;
-  };
-  int main() {
-    Singleton::instance.do_shit_brotha();
-  }
+
   return;
 }

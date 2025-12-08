@@ -27,7 +27,7 @@ namespace voxory {
 
       template<typename Pointer, typename Alloc, typename... Args>
       inline constexpr bool IsNoexceptConstructRange_v = IsNoexceptConstructRange<Pointer, Alloc, Args...>;
-
+      //TODO: SWAP PROXIES!!!
       template<typename Traits>
       class ConstHeapArrayIterator
 #ifdef DEBUG
@@ -210,7 +210,7 @@ namespace voxory {
       };
 
     }
-    // debug-friendly Policy для підстановки в шаблон
+    // debug-friendly Policy 
     template<
       typename T,
       typename Alloc = std::allocator<T>,
@@ -251,18 +251,18 @@ namespace voxory {
       using grow_policy = typename Policy::grow_policy;
       using iterator = typename Policy::iterator;
       using const_iterator = typename Policy::const_iterator;
-
+      friend cleanup_guard;
       static_assert(std::is_same_v<value_type, typename allocator_traits::value_type>, "value_type must match allocator_traits::value_type");
       static_assert(std::is_object_v<value_type>, "value_type must be an object type");
 
-      heap_array(size_t count, value_type&& val, allocator_type& alloc = allocator_type())
+      heap_array(size_t count, value_type&& val, const allocator_type& alloc = allocator_type())
         noexcept(noexcept(allocate_buffer_non_zero(std::declval<size_t>()))
           && noexcept(construct_range(std::declval<size_t>(), std::declval<value_type&&>())))
         : pair_(FirstOneSecondArgs{}, alloc), capacity_(count) {
         construct_range(count, std::forward<value_type>(val));
       };
 
-      heap_array(size_t count, allocator_type& alloc = allocator_type())
+      heap_array(size_t count, const allocator_type& alloc = allocator_type())
         noexcept(noexcept(allocate_buffer_non_zero(std::declval<size_t>()))
           && noexcept(construct_range(std::declval<size_t>(), std::declval<value_type&&>())))
         : pair_(FirstOneSecondArgs{}, alloc), capacity_(count)
@@ -286,7 +286,7 @@ namespace voxory {
       ~heap_array() {
         cleanup();
       }
-
+      //TODO: MOVE/COPY SEMANTICS FOR ITERATOR!!!
       heap_array& operator=(heap_array&& o)
         noexcept(
           allocator_traits::propagate_on_container_move_assignment::value
@@ -461,7 +461,7 @@ namespace voxory {
         allocate_buffer(new_capacity);
       };
 
-      NODISCARD CONSTEXPR pointer reallocate(size_type new_capacity) {
+      NODISCARD CONSTEXPR void reallocate(size_type new_capacity) {
         auto& data = pair_.second_;
         auto& alloc = get_allocator();
         auto& first = data.first;
@@ -583,11 +583,11 @@ namespace voxory {
         auto& data = pair_.second_;
         auto& first = data.first;
         auto& last = data.second;
+#ifdef DEBUG
+       release_proxy();
+#endif // DEBUG
         if (first != nullptr)
         {
-#ifdef DEBUG
-          release_proxy();
-#endif // DEBUG
           destroy_range(first, last);
           deallocate_buffer();
         }
@@ -657,7 +657,7 @@ namespace voxory {
           allocate_buffer(count);
           cleanup_guard guard(this);
           if constexpr (args_count == 0) {
-            last = internal::uninitialized_default_construct(first, last, alloc);
+            last = internal::uninitialized_default_construct_n(first, count, alloc);
           }
           else if constexpr (args_count == 1) {
             last = internal::uninitialized_fill_n(first, capacity_, std::forward<Args>(args)..., alloc);
