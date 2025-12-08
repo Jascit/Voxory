@@ -24,9 +24,9 @@ namespace utility {
   template<typename T1, typename T2, bool = std::is_empty_v<T1> && !std::is_final_v<T1>>
   class compressed_pair final {
     T1 first_;
-    T2 second_;
 
   public:
+    T2 second_;
     constexpr void swap(compressed_pair<T1, T2, false>& other) noexcept(std::is_nothrow_copy_assignable_v<T1>&& std::is_nothrow_copy_assignable_v<T2>) {
       T1 temp1_ = std::move(first_);
       T2 temp2_ = std::move(second_);
@@ -60,16 +60,13 @@ namespace utility {
 
     constexpr T1& first() noexcept { return first_; }
     constexpr const T1& first() const noexcept { return first_; }
-
-    constexpr T2& second() noexcept { return second_; }
-    constexpr const T2& second() const noexcept { return second_; }
   };
 
   template<typename T1, typename T2>
   class compressed_pair<T1, T2, true> final : private T1 {
+  public:
     T2 second_;
 
-  public:
     constexpr void swap(compressed_pair<T1, T2>& other) noexcept(
       std::is_nothrow_move_assignable_v<T1>&& std::is_nothrow_move_assignable_v<T2>)
     {
@@ -104,9 +101,6 @@ namespace utility {
 
     constexpr T1& first() noexcept { return static_cast<T1&>(*this); }
     constexpr const T1& first() const noexcept { return static…_cast<T1 const&>(*this); }
-
-    constexpr T2& second() noexcept { return second_; }
-    constexpr const T2& second() const noexcept { return second_; }
   };
 
   template<typename Alloc, typename FirstIt, typename SecondIt>

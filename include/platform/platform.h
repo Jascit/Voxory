@@ -162,3 +162,14 @@ static inline void linux_abort_with_core() {
 #if defined(DEBUG)
 #  pragma message("DEBUG is ON")
 #endif
+
+#ifdef X64
+  #ifndef mm_pause()
+    #define mm_pause() _mm_pause();
+  #endif // !mm_pause()
+#elif defined(X64_ARM)
+  #ifndef mm_pause()
+    #define mm_pause() _mm_pause();
+  #endif // !mm_pause()
+#endif // def X64
+
