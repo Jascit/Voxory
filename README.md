@@ -54,7 +54,7 @@ The long-term goal is a **single cross-platform audio + ASR pipeline** with plat
 
 ## Languages & Technologies
 
-* **C++17**
+* **C++23**
 * **Whisper (whisper.cpp)**
 * Platform audio APIs:
 
@@ -140,7 +140,7 @@ Key parameters are defined directly in code:
 * thread count
 * language
 
-A proper configuration system is planned.
+A proper dynamic configuration system is planned.
 
 ---
 
