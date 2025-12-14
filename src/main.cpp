@@ -1,215 +1,383 @@
+/*
+  MVP: Windows WASAPI Loopback ? Whisper real-time transcription
 
-#include <whisper.h>
+  Purpose:
+  --------
+  Minimal end-to-end prototype that captures system audio
+  (what the user hears) via WASAPI loopback and feeds it
+  into Whisper for near real-time speech-to-text.
+
+  What this code does:
+  --------------------
+  - Initializes COM and WASAPI in shared loopback mode
+  - Captures audio from the default render device
+  - Downmixes multi-channel audio to mono
+  - Resamples device sample rate to WHISPER_SAMPLE_RATE
+  - Collects fixed-size audio chunks (step_ms / length_ms)
+  - Runs Whisper inference continuously
+  - Prints recognized text to stdout
+
+  Design notes:
+  -------------
+  - This is an MVP / proof-of-concept, not production code
+  - Error handling is minimal and mostly fail-fast
+  - Resampling is naive (accumulator-based, no filtering)
+  - No advanced VAD, buffering strategy, or latency tuning
+  - Audio pipeline prioritizes simplicity over correctness
+
+  Assumptions:
+  ------------
+  - Windows only
+  - Default audio output device
+  - Whisper model already downloaded
+  - GPU available and enabled (if supported)
+
+  Intended use:
+  -------------
+  - Rapid prototyping
+  - Experiments with real-time transcription
+  - Base for a cleaner, modular audio + inference pipeline
+
+  Not intended for:
+  -----------------
+  - Long-running production services
+  - High-quality audio processing
+  - Accurate timing or lip-sync use cases
+*/
+
 #define NOMINMAX
-#include <algorithm>
-#include <cstdint>
+#include <windows.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <avrt.h>
+#include <comdef.h>
+#include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <system_error>
 #include <thread>
 #include <vector>
-#include <windows.h>
-  ///
-#include <containers/chunk_buffer.h>
-#include <audio/audio_internal.h>
-#include <audio/realtime/audio_capture.h>
-//
-//  static std::string to_timestamp(int64_t t, bool comma = false) {
-//  int64_t msec = t * 10;
-//  int64_t hr = msec / (1000 * 60 * 60);
-//  msec = msec - hr * (1000 * 60 * 60);
-//  int64_t min = msec / (1000 * 60);
-//  msec = msec - min * (1000 * 60);
-//  int64_t sec = msec / 1000;
-//  msec = msec - sec * 1000;
-//
-//  char buf[32];
-//  snprintf(buf, sizeof(buf), "%02d:%02d:%02d%s%03d", (int)hr, (int)min, (int)sec, comma ? "," : ".", (int)msec);
-//
-//  return std::string(buf);
-//}
-//
-//// ---------- Main: producer/consumer threads ----------
-//int main() {
-//  SetConsoleOutputCP(CP_UTF8);
-//  ggml_backend_load_all();
-//
-//  // config
-//  const std::string MODEL_PATH = "C:\\CPP\\transcripter\\dependencies\\whisper\\models\\ggml-large-v3-turbo.bin";
-//  const std::string OUT_TEXT = "transcript.txt";
-//  const bool USE_GPU = true;
-//  const bool FLASH_ATTN = true;
-//  const int THREADS = std::min(4u, std::thread::hardware_concurrency());
-//
-//  // whisper init (context shared Ч consumer uses it for inference)
-//  struct whisper_context_params cparams = whisper_context_default_params();
-//  cparams.use_gpu = USE_GPU;
-//  cparams.flash_attn = FLASH_ATTN;
-//
-//  std::cerr << "[info] initializing model '" << MODEL_PATH << "' ...\n";
-//  struct whisper_context* ctx = whisper_init_from_file_with_params(MODEL_PATH.c_str(), cparams);
-//  if (!ctx) {
-//    std::cerr << "[error] failed to init model\n";
-//    return 1;
-//  }
-//
-//  const size_t sample_rate = WHISPER_SAMPLE_RATE; // 16000
-//  const size_t chunk_seconds = 30;
-//  const size_t chunk_samples = sample_rate * chunk_seconds;
-//  const size_t capacity_seconds = chunk_seconds * 2; // total buffer seconds
-//  const size_t capacity_slots = std::max((size_t)4, capacity_seconds / chunk_seconds);
-//
-//  ChunkRing ring(capacity_slots, chunk_samples);
-//  std::atomic<bool> stop_flag(false);
-//
-//  // consumer thread: no mutex, busy wait with small sleep
-//  std::thread consumer([&]() {
-//    whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-//    wparams.print_progress = false;
-//    wparams.print_realtime = false;
-//    wparams.print_timestamps = true;
-//    wparams.translate = false;
-//    wparams.single_segment = true;
-//    wparams.n_threads = THREADS;
-//    wparams.language = "en";
-//
-//    size_t out_count = 0;
-//    while (!stop_flag.load(std::memory_order_relaxed)) {
-//      const float* ptr = ring.try_pop_chunk(out_count);
-//      if (ptr == nullptr) {
-//        // no data: busy-wait with tiny sleep
-//        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-//        continue;
-//      }
-//      // ptr points to chunk_samples floats; do NOT copy
-//      // run inference directly on ptr
-//      int rc = whisper_full(ctx, wparams, (float*)ptr, (int)out_count);
-//      if (rc != 0) {
-//        std::cerr << "[error] whisper_full failed: " << rc << "\n";
-//        continue;
-//      }
-//
-//      const int n_segments = whisper_full_n_segments(ctx);
-//      std::string out_all;
-//      for (int i = 0; i < n_segments; ++i) {
-//        const char* text = whisper_full_get_segment_text(ctx, i);
-//        const int64_t t0 = whisper_full_get_segment_t0(ctx, i);
-//        const int64_t t1 = whisper_full_get_segment_t1(ctx, i);
-//        std::string line = "[" + to_timestamp(t0) + " --> " + to_timestamp(t1) + "] " + text + "\n";
-//        out_all += line;
-//        std::cout << line;
-//      }
-//      if (!out_all.empty()) {
-//        std::ofstream fout(OUT_TEXT, std::ios::app | std::ios::binary);
-//        if (fout) fout.write(out_all.data(), out_all.size());
-//      }
-//    }
-//    std::cerr << "[info] consumer exiting\n";
-//    });
-//
-//  // producer thread: capture 1s -> parse -> copy into ring slot
-//  std::thread listener([&]() {
-//    capture_loopback_5s_wav_buffer(ring);
-//    });
-//
-//  std::thread producer([&]() {
-//    while (!stop_flag.load(std::memory_order_relaxed)) {
-//      std::vector<float> pcmf32;
-//      int sr = 0, ch = 0;
-//      if (!read_wav_pcm16_from_buffer(wavbuf, pcmf32, sr, ch)) {
-//        std::cerr << "[error] parse wav failed\n";
-//        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-//        continue;
-//      }
-//      if (sr != (int)sample_rate) {
-//        std::cerr << "[warn] sample rate mismatch: " << sr << " expected " << sample_rate << "\n";
-//        // TODO: resample here if necessary; for now skip
-//        continue;
-//      }
-//      if (ch != 1) {
-//        std::cerr << "[warn] channels != 1: " << ch << "\n";
-//        continue;
-//      }
-//
-//      // push chunk (copy from pcmf32 into ring slot). This is the only memcpy.
-//      bool ok = ring.push_chunk(pcmf32.data(), stop_flag);
-//      if (!ok) break;
-//    }
-//    std::cerr << "[info] producer exiting\n";
-//    });
-//  // run until user presses Enter
-//  std::vector<uint8_t> a;
-//  capture_loopback_5s_wav_buffer(5);
-//  std::cerr << "[info] running. Press Enter to stop...\n";
-//  std::string dummy;
-//  std::getline(std::cin, dummy);
-//  stop_flag.store(true);
-//
-//  consumer.join();
-//  //  producer.join();
-//
-//  whisper_print_timings(ctx);
-//  whisper_free(ctx);
-//
-//  std::cerr << "[info] exited\n";
-//  return 0;
-//}
 
+#include "whisper.h"
+
+static const int n_threads = std::min(4, (int)std::thread::hardware_concurrency());
+static const int step_ms = 15000;
+static const int length_ms = 15000;
+static const int keep_ms = 0;
+
+//
+// Minimal WASAPI loopback capture helper
+//
+class WasapiLoopback {
+public:
+  WasapiLoopback() : pEnumerator(nullptr), pDevice(nullptr), pAudioClient(nullptr), pCaptureClient(nullptr), pwfx(nullptr), running(false) {
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+  }
+
+  ~WasapiLoopback() {
+    stop();
+    if (pCaptureClient) pCaptureClient->Release();
+    if (pAudioClient) pAudioClient->Release();
+    if (pDevice) pDevice->Release();
+    if (pEnumerator) pEnumerator->Release();
+    if (pwfx) CoTaskMemFree(pwfx);
+    CoUninitialize();
+  }
+
+  bool init(int target_sample_rate) {
+    // get default render device
+    HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+      __uuidof(IMMDeviceEnumerator), (void**)&pEnumerator);
+    if (FAILED(hr) || !pEnumerator) {
+      fprintf(stderr, "WASAPI: failed to create MMDeviceEnumerator: 0x%08x\n", hr);
+      return false;
+    }
+
+    hr = pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice);
+    if (FAILED(hr) || !pDevice) {
+      fprintf(stderr, "WASAPI: failed to get default render endpoint: 0x%08x\n", hr);
+      return false;
+    }
+
+    hr = pDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&pAudioClient);
+    if (FAILED(hr) || !pAudioClient) {
+      fprintf(stderr, "WASAPI: failed to activate IAudioClient: 0x%08x\n", hr);
+      return false;
+    }
+
+    // get mix format
+    hr = pAudioClient->GetMixFormat(&pwfx);
+    if (FAILED(hr) || !pwfx) {
+      fprintf(stderr, "WASAPI: GetMixFormat failed: 0x%08x\n", hr);
+      return false;
+    }
+
+    const REFERENCE_TIME hnsRequestedDuration = 10000000; // 1 second for buffer (safe)
+    DWORD streamFlags = AUDCLNT_STREAMFLAGS_LOOPBACK;
+
+    hr = pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, streamFlags, hnsRequestedDuration, 0, pwfx, nullptr);
+    if (FAILED(hr)) {
+      fprintf(stderr, "WASAPI: IAudioClient::Initialize failed: 0x%08x\n", hr);
+      return false;
+    }
+
+    hr = pAudioClient->GetService(__uuidof(IAudioCaptureClient), (void**)&pCaptureClient);
+    if (FAILED(hr) || !pCaptureClient) {
+      fprintf(stderr, "WASAPI: GetService(IAudioCaptureClient) failed: 0x%08x\n", hr);
+      return false;
+    }
+
+    // store some format info
+    channels = pwfx->nChannels;
+    device_sample_rate = pwfx->nSamplesPerSec;
+    bytes_per_sample = pwfx->wBitsPerSample / 8;
+
+    return true;
+  }
+
+  bool start() {
+    if (!pAudioClient) return false;
+    HRESULT hr = pAudioClient->Start();
+    if (FAILED(hr)) {
+      fprintf(stderr, "WASAPI: Start failed: 0x%08x\n", hr);
+      return false;
+    }
+    running = true;
+    return true;
+  }
+
+  void stop() {
+    if (pAudioClient && running) {
+      pAudioClient->Stop();
+      running = false;
+    }
+  }
+
+  bool get(int ms, std::vector<float>& out) {
+    if (!pCaptureClient || !pwfx) return false;
+
+    const uint32_t wanted_frames = (uint32_t)((int64_t)ms * WHISPER_SAMPLE_RATE / 1000);
+    out.clear();
+    out.reserve(wanted_frames);
+
+    uint32_t collected = 0;
+
+    int loops = 0;
+
+    while (collected < wanted_frames) {
+      UINT32 packetFrames = 0;
+      HRESULT hr = pCaptureClient->GetNextPacketSize(&packetFrames);
+      if (FAILED(hr)) {
+        fprintf(stderr, "WASAPI: GetNextPacketSize failed: 0x%08x\n", hr);
+        return false;
+      }
+
+      if (packetFrames == 0) {
+        // no data yet: sleep small bit
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        continue;
+      }
+
+      BYTE* pData;
+      UINT32 framesAvailable;
+      DWORD flags;
+      hr = pCaptureClient->GetBuffer(&pData, &framesAvailable, &flags, nullptr, nullptr);
+      if (FAILED(hr)) {
+        fprintf(stderr, "WASAPI: GetBuffer failed: 0x%08x\n", hr);
+        return false;
+      }
+
+      if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
+        for (UINT32 f = 0; f < framesAvailable && collected < wanted_frames; ++f) {
+          out.push_back(0.0f);
+          ++collected;
+        }
+      }
+      else {
+        if (pwfx->wFormatTag == WAVE_FORMAT_IEEE_FLOAT ||
+          (pwfx->wFormatTag == WAVE_FORMAT_EXTENSIBLE && ((WAVEFORMATEXTENSIBLE*)pwfx)->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)) {
+
+          const float* src = reinterpret_cast<const float*>(pData);
+          for (UINT32 f = 0; f < framesAvailable; ++f) {
+            float sample = 0.0f;
+            for (int c = 0; c < channels; ++c) {
+              sample += src[f * channels + c];
+            }
+            sample /= (float)channels;
+            append_sample_resample(sample, device_sample_rate, out, collected, wanted_frames);
+          }
+        }
+        else if (pwfx->wFormatTag == WAVE_FORMAT_PCM) {
+          if (bytes_per_sample == 2) {
+            const int16_t* src = reinterpret_cast<const int16_t*>(pData);
+            for (UINT32 f = 0; f < framesAvailable; ++f) {
+              float sample = 0.0f;
+              for (int c = 0; c < channels; ++c) {
+                sample += src[f * channels + c] / 32768.0f;
+              }
+              sample /= (float)channels;
+              append_sample_resample(sample, device_sample_rate, out, collected, wanted_frames);
+            }
+          }
+          else {
+            for (UINT32 f = 0; f < framesAvailable && collected < wanted_frames; ++f) {
+              out.push_back(0.0f);
+              ++collected;
+            }
+          }
+        }
+        else {
+          for (UINT32 f = 0; f < framesAvailable && collected < wanted_frames; ++f) {
+            out.push_back(0.0f);
+            ++collected;
+          }
+        }
+      }
+
+      hr = pCaptureClient->ReleaseBuffer(framesAvailable);
+      if (FAILED(hr)) {
+        fprintf(stderr, "WASAPI: ReleaseBuffer failed: 0x%08x\n", hr);
+        return false;
+      }
+    }
+
+    while (collected < wanted_frames) {
+      out.push_back(0.0f);
+      ++collected;
+    }
+
+    return true;
+  }
+
+private:
+  IMMDeviceEnumerator* pEnumerator;
+  IMMDevice* pDevice;
+  IAudioClient* pAudioClient;
+  IAudioCaptureClient* pCaptureClient;
+  WAVEFORMATEX* pwfx;
+  UINT32 channels;
+  UINT32 device_sample_rate;
+  UINT32 bytes_per_sample;
+  bool running;
+
+  void append_sample_resample(float sample, uint32_t dev_rate, std::vector<float>& out, uint32_t& collected, uint32_t wanted_frames) {
+    static double acc = 0.0;
+    const double ratio = (double)dev_rate / (double)WHISPER_SAMPLE_RATE;
+    if (dev_rate == WHISPER_SAMPLE_RATE) {
+      if (collected < wanted_frames) { out.push_back(sample); ++collected; }
+      return;
+    }
+    acc += 1.0 / ratio;
+    if (acc >= 1.0) {
+      if (collected < wanted_frames) { out.push_back(sample); ++collected; }
+      acc -= 1.0;
+    }
+    else {
+      //skip
+    }
+  }
+};
 
 int main() {
-  std::cout << "Hello, World!" << std::endl;
-  audio::AudioCapture& ac = audio::AudioCapture::Get();
-  ac.initialize(1); // 5 seconds buffer
-  ac.start_capture();
-  std::this_thread::sleep_for(std::chrono::milliseconds(4990));
-  containers::ring_buffer<float> captured_mono;
-  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-  std::cout << "time taken to get buffer(ring): " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() << " ns\n";
-  captured_mono.reserve(44100);
-  ac.get_captured_buffer(captured_mono);
-  std::vector<float> source(44100, 0.5f);
+  ggml_backend_load_all();
 
-  std::vector<float> dest;
-  dest.resize(source.size());
+  const int n_samples_step = (1e-3 * step_ms) * WHISPER_SAMPLE_RATE;
+  const int n_samples_len = (1e-3 * length_ms) * WHISPER_SAMPLE_RATE;
+  const int n_samples_keep = (1e-3 * keep_ms) * WHISPER_SAMPLE_RATE;
+  const int n_samples_30s = (1e-3 * 30000.0) * WHISPER_SAMPLE_RATE;
 
-  auto start1 = std::chrono::steady_clock::now();
+  const bool use_vad = n_samples_step <= 0;
+  const int n_new_line = !use_vad ? std::max(1, length_ms / step_ms - 1) : 1;
 
-  // ≈мул€ц≥€ твого get_captured_buffer: коп≥юЇмо з source у dest
-  std::memcpy(dest.data(), source.data(), source.size() * sizeof(float));
+  std::string model_path = "C:\\CPP\\Voxory\\dependencies\\whisper\\models\\ggml-large-v3-turbo.bin";
 
-  auto end1 = std::chrono::steady_clock::now();
+  struct whisper_context_params cparams = whisper_context_default_params();
+  cparams.use_gpu = true;
+  cparams.flash_attn = true;
 
-  std::cout
-    << "time taken to copy vector buffer: "
-    << std::chrono::duration_cast<std::chrono::nanoseconds>(end1 - start1).count()
-    << " ns\n";
-  ac.shutdown();
+  struct whisper_context* ctx = whisper_init_from_file_with_params(model_path.c_str(), cparams);
+  if (ctx == nullptr) {
+    fprintf(stderr, "error: failed to initialize whisper context\n");
+    return 2;
+  }
+
+  std::vector<float> pcmf32(n_samples_30s, 0.0f);
+  std::vector<float> pcmf32_old;
+  std::vector<float> pcmf32_new(n_samples_30s, 0.0f);
+  std::vector<whisper_token> prompt_tokens;
+
+  WasapiLoopback wasapi;
+  if (!wasapi.init(WHISPER_SAMPLE_RATE)) {
+    fprintf(stderr, "Failed to init WASAPI loopback\n");
+    return 1;
+  }
+  if (!wasapi.start()) {
+    fprintf(stderr, "Failed to start WASAPI capture\n");
+    return 1;
+  }
+
+  printf("[Start capturing loopback Ч what the user hears]\n");
+  fflush(stdout);
+
+  int n_iter = 0;
+  bool is_running = true;
+
+  while (is_running) {
+    if (!use_vad) {
+      if (!wasapi.get(step_ms, pcmf32_new)) {
+        fprintf(stderr, "WASAPI get failed\n");
+        break;
+      }
+
+      const int n_samples_new = pcmf32_new.size();
+      const int n_samples_take = std::min((int)pcmf32_old.size(), std::max(0, n_samples_keep + n_samples_len - n_samples_new));
+
+      pcmf32.resize(n_samples_new + n_samples_take);
+      for (int i = 0; i < n_samples_take; ++i) {
+        pcmf32[i] = pcmf32_old[pcmf32_old.size() - n_samples_take + i];
+      }
+      memcpy(pcmf32.data() + n_samples_take, pcmf32_new.data(), n_samples_new * sizeof(float));
+      pcmf32_old = pcmf32;
+    }
+    else {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      continue;
+    }
+
+    whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    wparams.print_progress = false;
+    wparams.print_special = false;
+    wparams.print_realtime = false;
+    wparams.print_timestamps = false;
+    wparams.translate = false;
+    wparams.single_segment = !use_vad;
+    wparams.max_tokens = 0;
+    wparams.language = "en";
+    wparams.n_threads = n_threads;
+
+    if (whisper_full(ctx, wparams, pcmf32.data(), pcmf32.size()) != 0) {
+      fprintf(stderr, "whisper_full() failed\n");
+      break;
+    }
+
+    const int n_segments = whisper_full_n_segments(ctx);
+    for (int i = 0; i < n_segments; ++i) {
+      const char* text = whisper_full_get_segment_text(ctx, i);
+      printf("%s", text);
+      fflush(stdout);
+    }
+    printf("\n");
+    ++n_iter;
+
+    if (!use_vad && (n_iter % n_new_line) == 0) {
+      pcmf32_old = std::vector<float>(pcmf32.end() - n_samples_keep, pcmf32.end());
+    }
+  }
+
+  wasapi.stop();
+  whisper_free(ctx);
   return 0;
 }
-
-class some_shit {
-  some_shit() {
-    data = static_cast<size_t*>(malloc(sizeof(size_t) * 100));
-  }
-  ~some_shit() {
-    free(data);
-  }
-private:
-  size_t* data;
-};
-///////////////
-// Resample to TARGET_SR
-//std::vector<float> resampled = resample_linear(captured_mono, src_rate, TARGET_SR);
-
-// Ensure exact length TARGET_SR * DURATION_SEC
-//size_t want_samples = static_cast<size_t>(std::round(TARGET_SR * DURATION_SEC));
-//if (resampled.size() < want_samples) resampled.resize(want_samples, 0.0f);
-//if (resampled.size() > want_samples) resampled.resize(want_samples);
-
-//std::vector<int16_t> pcm16;
-//pcm16.reserve(resampled.size());
-//for (float v : resampled) pcm16.push_back(f32_to_s16_clamped(v));

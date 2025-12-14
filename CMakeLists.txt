@@ -21,7 +21,7 @@ endif()
 # Tests
 add_subdirectory(dependencies/whisper)
 # Ваш exe
-add_executable(transcripter "src/main.cpp" "include/containers/detail/containers_internal.h" "include/containers/impl/heap_array.h" "include/platform/platform.h" "include/containers/impl/static_array.h" "include/containers/container_dbg.h" "include/containers/containers.h" "include/multithreading/spin_lock.h")
+add_executable(transcripter "src/main.cpp" "include/containers/impl/list.h")
 
 # Лінкуємо whisper
 target_link_libraries(transcripter PRIVATE whisper)

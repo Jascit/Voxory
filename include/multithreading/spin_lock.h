@@ -10,11 +10,19 @@ namespace voxory {
 
       // Заборонити копіювання
       spin_lock(const spin_lock&) = delete;
-      spin_lock& operator=(const spin_lock&) = delete;
+      spin_lock& operator=(const spin_lock& o) {
+        if (this == std::addressof(o)) return *this;
+        flag_._Storage.store(o.flag_.test(), std::memory_order_seq_cst);
+        return *this;
+      };
 
       // Дозволити переміщення (не робить реального переміщення, але потрібно для контейнерів)
       spin_lock(spin_lock&&) noexcept {}
-      spin_lock& operator=(spin_lock&&) noexcept { return *this; }
+      spin_lock& operator=(spin_lock&& o) noexcept { 
+        if (this == std::addressof(o)) return *this;
+        flag_._Storage.store(o.flag_.test(), std::memory_order_seq_cst);
+        return *this; 
+      }
 
       ~spin_lock() noexcept = default;
 

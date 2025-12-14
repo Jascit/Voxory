@@ -35,6 +35,8 @@ namespace voxory
       struct get_inlined_size<Policy, std::void_t<typename Policy::inlined_size>> : Policy::inlined_size {};
 
       struct empty_data {};
+      struct move_tag {};
+      struct copy_tag {};
 
       template<typename Alloc>
       class construct_helper {

@@ -50,7 +50,7 @@ else()
         )
     endif()
 
-    target_link_libraries(CORE_MODULE_CONTAINERS_TESTS PUBLIC CORE_MODULE)
+    target_link_libraries(CORE_MODULE_CONTAINERS_TESTS PRIVATE CoreModule)
 
     if(TARGET CORE_MODULE_CONTAINERS_TESTS)
         message(STATUS "CORE_MODULE_CONTAINERS_TEST: [SUCCESS] created CORE_MODULE_CONTAINERS_TESTS")

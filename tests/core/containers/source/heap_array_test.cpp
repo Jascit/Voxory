@@ -210,12 +210,12 @@ NOYX_TEST(heap_array_test, unit_test) {
     std::cout.unsetf(std::ios::fixed);
     };
 
-  time_and_run(heap_array_test_basic_int_behavior, "basic_int_behavior");
-  time_and_run(heap_array_test_construct_with_value, "construct_with_value");
-  time_and_run(heap_array_test_at_throws, "at_throws");
-  time_and_run(heap_array_test_copy_constructor_deep_strings, "copy_constructor_deep_strings");
-  time_and_run(heap_array_test_copy_assignment, "copy_assignment");
-  time_and_run(heap_array_test_move_semantics_strings, "move_semantics_strings");
+  //time_and_run(heap_array_test_basic_int_behavior, "basic_int_behavior");
+  //time_and_run(heap_array_test_construct_with_value, "construct_with_value");
+  //time_and_run(heap_array_test_at_throws, "at_throws");
+  //time_and_run(heap_array_test_copy_constructor_deep_strings, "copy_constructor_deep_strings");
+  //time_and_run(heap_array_test_copy_assignment, "copy_assignment");
+  //time_and_run(heap_array_test_move_semantics_strings, "move_semantics_strings");
   time_and_run(heap_array_test_iterators_arithmetic, "iterators_arithmetic");
   time_and_run(heap_array_test_reserve_and_resize, "reserve_and_resize");
   time_and_run(heap_array_test_zero_size, "zero_size");

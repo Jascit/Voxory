@@ -9,6 +9,7 @@
 #include <mmreg.h> // for WAVEFORMATEXTENSIBLE
 #include <stdint.h>
 #include <cmath>
+#include <containers/impl/ring_buffer.h>
 
 #pragma comment(lib, "Ole32.lib")
 #pragma comment(lib, "Avrt.lib")
@@ -23,11 +24,11 @@ static inline int16_t f32_to_s16_clamped(float v) {
 }
 
 // Linear resampler (mono float)
-static std::vector<float> resample_linear(const std::vector<float>& src, uint32_t src_rate, uint32_t dst_rate) {
+static containers::ring_buffer<float> resample_linear(const containers::ring_buffer<float>& src, uint32_t src_rate, uint32_t dst_rate) {
   if (src_rate == dst_rate) return src;
   const double ratio = static_cast<double>(src_rate) / static_cast<double>(dst_rate);
   const size_t dst_len = static_cast<size_t>(std::ceil(src.size() / ratio));
-  std::vector<float> dst(dst_len);
+  containers::ring_buffer<float> dst(dst_len);
   for (size_t i = 0; i < dst_len; ++i) {
     double src_pos = i * ratio;
     size_t i0 = static_cast<size_t>(std::floor(src_pos));

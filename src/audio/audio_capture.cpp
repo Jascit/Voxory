@@ -246,12 +246,16 @@ void AudioCapture::get_captured_buffer(containers::ring_buffer<float>& out) cons
   noexcept(noexcept(std::declval<containers::ring_buffer<float>&>().get_interval(std::declval<size_t>(), std::declval<size_t>(), std::declval<containers::ring_buffer<float>&>())))
 {
   size_t frameSize = m_srcRate * m_durationSec;
+  if (frameSize == 0) return;
+
   size_t head = captured_buffer.get_head();
-  size_t idx = 0;
-  if (head/frameSize != 0)
-  {
-    size_t idx = (frameSize * (head / (frameSize)-frameSize));// start of last full duration
+  size_t segments = head / frameSize;
+  size_t idx = (segments == 0) ? 0 : (segments - 1) * frameSize;
+
+  if (captured_buffer.size() > 0) {
+    idx %= captured_buffer.size(); // на випадок, якщо head може бути > capacity
   }
+
   captured_buffer.get_interval(idx, frameSize, out);
 }
 

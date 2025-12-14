@@ -1,14 +1,14 @@
 #pragma once
 #define NOMINMAX
 #include <audio/audio_internal.h>
-#include <containers/ring_buffer.h>
+#include <containers/impl/ring_buffer.h>
 #include <thread>
 #include <functional>
 #include <algorithm> 
 
 namespace audio { 
   namespace detail {
-    auto make_processor_float = [](uint16_t srcCh, UINT32 numFrames, void* pData, containers::ring_buffer<float>& outBuf) {
+    inline auto make_processor_float = [](uint16_t srcCh, UINT32 numFrames, void* pData, containers::ring_buffer<float>& outBuf) {
       const float* src = reinterpret_cast<const float*>(pData);
       for (UINT32 f = 0; f < numFrames; ++f) {
         float mix = 0.0f;
@@ -22,7 +22,7 @@ namespace audio {
     };
 
     template<typename IntT>
-    auto make_processor_int = [](uint16_t srcCh, UINT32 numFrames, void* pData, containers::ring_buffer<float>& outBuf) {
+    inline auto make_processor_int = [](uint16_t srcCh, UINT32 numFrames, void* pData, containers::ring_buffer<float>& outBuf) {
       const IntT* src = reinterpret_cast<const IntT*>(pData);
       constexpr double div = static_cast<double>(std::numeric_limits<IntT>::max());
       for (UINT32 f = 0; f < numFrames; ++f) {
@@ -41,13 +41,14 @@ namespace audio {
   public:
     bool initialize(size_t duration_sec = 5);
     void start_capture();
-    void get_captured_buffer(containers::ring_buffer<float>& out) const noexcept(noexcept(std::declval<containers::ring_buffer<float>&>().get_interval(std::declval<size_t>(), std::declval<size_t>(), std::declval<containers::ring_buffer<float>&>())));
+    void get_captured_buffer(containers::ring_buffer<float>& out) const noexcept(noexcept(std::declval<containers::ring_buffer<float>&>().reserve(std::declval<size_t>())));
     _NODISCARD inline containers::ring_buffer<float>& get_buffer() noexcept { return captured_buffer; }
     inline void set_callback_function(std::function<void(uint16_t, UINT32, void*, containers::ring_buffer<float>&)> f) { m_f = f; }
     void stop();
     void wait_for_completion();
     void clear_buffer() noexcept;
     void shutdown();
+
   private:
     bool capture_loopback_buffer();
 
