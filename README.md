@@ -16,7 +16,7 @@ If you are interested in building a **cross-platform real-time transcription eng
 
 Early-stage, cross-platform **speech-to-text engine** based on **Whisper**, designed for real-time audio transcription.
 
-The current implementation is a **Windows MVP** using WASAPI loopback capture.
+The current implementation is a **Windows MVP** using WASAPI loopback capture(see src/main.cpp).
 Cross-platform support (Linux / macOS) is a **core design goal**, not yet fully implemented.
 
 ---
