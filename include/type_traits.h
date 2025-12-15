@@ -30,10 +30,37 @@ namespace type_traits {
   inline constexpr bool is_contiguous_iterator_v = is_contiguous_like<It>::value;
 
   template <typename It>
+  constexpr bool use_zero_memset_value_construct_v =
+    std::conjunction_v<
+    is_contiguous_iterator<It>,
+    std::is_scalar<iter_value_t<It>>,
+    std::negation<std::is_volatile<std::remove_reference_t<iter_reference_t<It>>>>,
+    std::negation<std::is_member_pointer<iter_value_t<It>>>
+    >;
+
+  template<typename T>
+  struct is_character : std::false_type {};
+  template<>
+  struct is_character<char> : std::true_type {};
+  template<>
+  struct is_character<char8_t> : std::true_type {};
+  template<>
+  struct is_character<uint8_t> : std::true_type {};
+  template<>
+  struct is_character<int8_t> : std::true_type {};
+
+  template<typename T>
+  struct is_boolean : std::false_type {};
+  
+  template<>
+  struct is_boolean<bool> : std::true_type {};
+  
+  template <typename It>
   constexpr bool use_memset_value_construct_v =
     std::conjunction_v<
     is_contiguous_iterator<It>,
     std::is_scalar<iter_value_t<It>>,
+    is_character<iter_value_t<It>>::value,
     std::negation<std::is_volatile<std::remove_reference_t<iter_reference_t<It>>>>,
     std::negation<std::is_member_pointer<iter_value_t<It>>>
     >;

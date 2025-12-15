@@ -139,31 +139,30 @@ namespace voxory {
           return const_cast<node_pointer>(this->unwrap());
         }
       };
+      template<typename T>
+      struct default_node {
+        using value_type = T;
+        default_node() : data_(nullptr), next_(nullptr), last_(nullptr) {}
+        default_node(value_type data, default_node* next = nullptr, default_node* last = nullptr)
+          : data_(data), next_(next), last_(last) {
+        }
+        ~default_node() = default;
+        value_type data_;
+        default_node* next_;
+        default_node* last_;
+      };
     }
-    namespace debug {
-      class iterator_base_dbg;
-    }
-    struct node {
-      using value_type = debug::iterator_base_dbg*;
-      node() : data_(nullptr), next_(nullptr), last_(nullptr) {}
-      node(value_type data, node* next = nullptr, node* last = nullptr)
-        : data_(data), next_(next), last_(last) {
-      }
-      ~node() = default;
-      mutable value_type data_;
-      mutable node* next_;
-      mutable node* last_;
-    };
 
+    template<typename T, typename Node = detail::default_node<T>>
     class list {
       using FirstOneSecondArgs = utility::detail::FirstOneSecondArgs;
       using FirstZeroSecondArgs = utility::detail::FirstZeroSecondArgs;
     public:
-      using node_type = node;
-      using allocator_type = std::allocator<node>;
+      using node_type = Node;
+      using allocator_type = std::allocator<node_type>;
       using allocator_traits = std::allocator_traits<allocator_type>;
-      using value_type = debug::iterator_base_dbg*;
-      using pointer = value_type*;
+      using value_type = T;
+      using pointer = node_type*;
       using const_pointer = const pointer;
       using reference = value_type&;
       using const_reference = const reference;
@@ -171,8 +170,10 @@ namespace voxory {
       using const_iterator = detail::ConstListIterator<list>;
       using size_type = std::size_t;
 
-      explicit list(size_t n = 0, allocator_type alloc = allocator_type())
-        : pair_(FirstOneSecondArgs{}, alloc, std::pair<node*, node*>{nullptr, nullptr}), size_(0)
+      list(allocator_type alloc = allocator_type()) noexcept(std::is_nothrow_default_constructible_v<allocator_type>) : pair_(FirstOneSecondArgs{}, alloc) {};
+
+      explicit list(size_t n, allocator_type alloc = allocator_type())
+        : pair_(FirstOneSecondArgs{}, alloc, std::pair<pointer, pointer>{nullptr, nullptr}), size_(0)
       {
         for (size_t i = 0; i < n; ++i) emplace_back(nullptr);
       }
@@ -221,29 +222,22 @@ namespace voxory {
         auto& data = pair_.second_;
         auto& o_data = o.pair_.second_;
 
-        auto steal_no_cleanup = [&]() -> list& {
-          data.first = std::exchange(o_data.first, nullptr);
-          data.second = std::exchange(o_data.second, nullptr);
-          size_ = std::exchange(o.size_, 0);
-          return *this;
-          };
-
         if constexpr (allocator_traits::propagate_on_container_move_assignment::value) {
           clear();
           al = std::move(o_al);
-          return steal_no_cleanup();
+          return steal_no_cleanup(o);
         }
         else {
           if constexpr (allocator_traits::is_always_equal::value)
           {
             clear();
-            return steal_no_cleanup();
+            return steal_no_cleanup(o);
           }
           else {
             if (al == o_al)
             {
               clear();
-              return steal_no_cleanup();
+              return steal_no_cleanup(o);
             }
             else
             {
@@ -285,11 +279,11 @@ namespace voxory {
       size_type size() const noexcept { return size_; }
 
       // push_back (встановлюємо last_ і next_)
-      CONSTEXPR node* push_back(const value_type& val) {
+      CONSTEXPR node_type* push_back(const value_type& val) {
         return emplace_back(val);
       }
 
-      CONSTEXPR node* push_back(value_type&& val) {
+      CONSTEXPR node_type* push_back(value_type&& val) {
         return emplace_back(std::move(val));
       }
 
@@ -301,15 +295,15 @@ namespace voxory {
           size_ = 0;
           return;
         }
-        node* tail = pair_.second_.second;
-        node* prev = tail->last_;
+        pointer tail = pair_.second_.second;
+        pointer prev = tail->last_;
         _destroy_node(tail);
         prev->next_ = nullptr;
         pair_.second_.second = prev;
         --size_;
       }
 
-      CONSTEXPR void pop_at(node* loc) {
+      CONSTEXPR void pop_at(pointer loc) {
         if (!loc) return;
 
         if (loc->last_) loc->last_->next_ = loc->next_;
@@ -333,9 +327,9 @@ namespace voxory {
       }
 
       CONSTEXPR void clear() noexcept {
-        node* cur = pair_.second_.first;
+        node_type* cur = pair_.second_.first;
         while (cur) {
-          node* next = cur->next_;
+          node_type* next = cur->next_;
           _destroy_node(cur);
           cur = next;
         }
@@ -343,7 +337,7 @@ namespace voxory {
         size_ = 0;
       }
 
-      CONSTEXPR node* data() {
+      CONSTEXPR node_type* data() {
         return pair_.second_.first;
       }
 
@@ -354,25 +348,32 @@ namespace voxory {
         return pair_.first();
       }
 
-      CONSTEXPR void _destroy_node(node* p) noexcept {
+      CONSTEXPR void _destroy_node(node_type* p) noexcept {
         if constexpr (!std::is_trivially_destructible_v<value_type>)
         {
-          if constexpr (!type_traits::has_destroy_v<allocator_type, node*>) {
+          if constexpr (!type_traits::has_destroy_v<allocator_type, pointer>) {
             std::destroy_at(p);
           }
           else
           {
-            
+            pair_.first().destroy(p);
           }
         }
         pair_.first().deallocate(p, 1);
       }
     private:
+      inline list& steal_no_cleanup(list& o) noexcept {
+        pair_.second_.first = std::exchange(o.pair_.second_.first, nullptr);
+        pair_.second_.second = std::exchange(o.pair_.second_.second, nullptr);
+        size_ = std::exchange(o.size_, 0);
+        return *this;
+      }
+
       template<typename U>
-      NODISCARD CONSTEXPR node* emplace_back(U&& val) {
-        node* p = pair_.first().allocate(1);
+      NODISCARD CONSTEXPR node_type* emplace_back(U&& val) {
+        pointer p = pair_.first().allocate(1);
         // placement new з повною ініціалізацією last_:
-        new (p) node(std::forward<U>(val), nullptr, pair_.second_.second);
+        new (p) node_type(std::forward<U>(val), nullptr, pair_.second_.second);
         if (!pair_.second_.first) {
           pair_.second_.first = pair_.second_.second = p;
         }
@@ -442,7 +443,7 @@ namespace voxory {
       }
 
     private:
-      utility::compressed_pair<allocator_type, std::pair<node*, node*>> pair_;
+      utility::compressed_pair<allocator_type, std::pair<pointer, pointer>> pair_;
       size_t size_;
     };
   }

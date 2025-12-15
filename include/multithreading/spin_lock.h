@@ -8,7 +8,6 @@ namespace voxory {
     public:
       spin_lock() noexcept {}
 
-      // Заборонити копіювання
       spin_lock(const spin_lock&) = delete;
       spin_lock& operator=(const spin_lock& o) {
         if (this == std::addressof(o)) return *this;
@@ -16,7 +15,6 @@ namespace voxory {
         return *this;
       };
 
-      // Дозволити переміщення (не робить реального переміщення, але потрібно для контейнерів)
       spin_lock(spin_lock&&) noexcept {}
       spin_lock& operator=(spin_lock&& o) noexcept { 
         if (this == std::addressof(o)) return *this;
@@ -28,7 +26,7 @@ namespace voxory {
 
       void lock() noexcept {
         while (flag_.test_and_set(std::memory_order_acquire)) {
-          mm_pause(); // якщо у тебе є архітектурна пауза
+          mm_pause();
         }
       }
 

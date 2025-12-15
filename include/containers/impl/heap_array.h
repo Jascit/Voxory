@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <platform/platform.h>
 #include <containers/detail/containers_internal.h>
-#include <containers/container_dbg.h>
+#include <containers/containers_dbg.h>
 
 namespace voxory {
   namespace containers {
@@ -30,9 +30,9 @@ namespace voxory {
       //TODO: SWAP PROXIES!!!
       template<typename Traits>
       class ConstHeapArrayIterator
-#ifdef DEBUG
+#ifdef DEBUG_ITERATORS
         : iterator_base
-#endif // DEBUG
+#endif // DEBUG_ITERATORS
       {
       public:
         using value_type = typename Traits::value_type;
@@ -41,16 +41,16 @@ namespace voxory {
         using reference = typename Traits::const_reference;
         using difference_type = std::ptrdiff_t;
         using iterator_category = std::random_access_iterator_tag;
-#ifdef DEBUG
+#ifdef DEBUG_ITERATORS
         CONSTEXPR ConstHeapArrayIterator(const container_base* container) noexcept : iterator_base(container), ptr_(nullptr) {}
         CONSTEXPR explicit ConstHeapArrayIterator(const container_base* container, pointer p) noexcept : iterator_base(container), ptr_(p) {}
         ~ConstHeapArrayIterator() {
-          release_on_destroy();
+          release();
         }
 #else
         CONSTEXPR ConstHeapArrayIterator() noexcept : ptr_(nullptr) {}
         CONSTEXPR explicit ConstHeapArrayIterator(pointer p) noexcept : ptr_(p) {}
-#endif // DEBUG
+#endif // DEBUG_ITERATORS
 
         NODISCARD CONSTEXPR reference operator*() const noexcept { return *ptr_; }
         NODISCARD CONSTEXPR const_pointer operator->() const noexcept { return ptr_; }
@@ -123,14 +123,14 @@ namespace voxory {
         using reference = typename Traits::reference;
         using difference_type = typename base_type::difference_type;
         using iterator_category = std::random_access_iterator_tag;
-#ifdef DEBUG
+#ifdef DEBUG_ITERATORS
         CONSTEXPR HeapArrayIterator(container_base* container) noexcept : base_type(container, nullptr) {}
         CONSTEXPR explicit HeapArrayIterator(container_base* container, pointer p) noexcept : base_type(container, p) {}
         ~HeapArrayIterator() = default;
 #else
         CONSTEXPR HeapArrayIterator() noexcept : base_type(nullptr) {}
         CONSTEXPR explicit HeapArrayIterator(pointer p) noexcept : base_type(p) {}
-#endif // DEBUG
+#endif // DEBUG_ITERATORS
 
 
         NODISCARD CONSTEXPR reference operator*() const noexcept {
@@ -300,32 +300,22 @@ namespace voxory {
         auto& data = pair_.second_;
         auto& o_data = o.pair_.second_;
 
-        auto steal_no_cleanup = [&]() -> heap_array& {
-          data.first = std::exchange(o_data.first, nullptr);
-          data.second = std::exchange(o_data.second, nullptr);
-          capacity_ = std::exchange(o.capacity_, 0);
-#ifdef DEBUG_ITERATORS
-          move_proxies(o);
-#endif // DEBUG_ITERATORS
-          return *this;
-          };
-
         if constexpr (allocator_traits::propagate_on_container_move_assignment::value) {
           cleanup();
           al = std::move(o_al);
-          return steal_no_cleanup();
+          return steal_no_cleanup(o);
         }
         else {
           if constexpr (allocator_traits::is_always_equal::value)
           {
             cleanup();
-            return steal_no_cleanup();
+            return steal_no_cleanup(o);
           }
           else {
             if (al == o_al)
             {
               cleanup();
-              return steal_no_cleanup();
+              return steal_no_cleanup(o);
             }
             else
             {
@@ -358,9 +348,9 @@ namespace voxory {
       };
 
       value_type& operator[](size_t idx) noexcept {
-#ifdef DEBUG
+#ifdef DEBUG_ITERATORS
         ASSERT_ABORT(idx < size(), "heap_array index out of bounds");
-#endif // DEBUG
+#endif // DEBUG_ITERATORS
 
         return pair_.second_.first[idx];
       };
@@ -429,7 +419,7 @@ namespace voxory {
       };
 
       NODISCARD CONSTEXPR const_iterator end() const noexcept {
-        return const_iterator(this, pair_.second_.second);
+        return ITER_DEBUG_WRAP(const_iterator, pair_.second_.second);
       };
 
       NODISCARD CONSTEXPR const_iterator begin() const noexcept {
@@ -445,6 +435,16 @@ namespace voxory {
       };
 
     private:
+      CONSTEXPR inline heap_array& steal_no_cleanup(heap_array& o) noexcept(noexcept(move_proxies(std::declval<heap_array&>()))) {
+        pair_.second_.first = std::exchange(o.pair_.second_.first, nullptr);
+        pair_.second_.second = std::exchange(o.pair_.second_.second, nullptr);
+        capacity_ = std::exchange(o.capacity_, 0);
+#ifdef DEBUG_ITERATORS
+        move_proxies(o);
+#endif // DEBUG_ITERATORS
+        return *this;
+        };
+
       CONSTEXPR void cleanup_and_reserve_with_grow() {
         auto& data = pair_.second_;
         auto& first = data.first;
@@ -558,9 +558,9 @@ namespace voxory {
         auto& data = pair_.second_;
         auto& first = data.first;
         auto& last = data.second;
-#ifdef DEBUG
+#ifdef DEBUG_ITERATORS
        release_proxy();
-#endif // DEBUG
+#endif // DEBUG_ITERATORS
         if (first != nullptr)
         {
           destroy_range(first, last);

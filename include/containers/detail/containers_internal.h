@@ -3,7 +3,7 @@
 #include <type_traits.h>
 #include <xmemory>
 #include <utility.h>
-#ifdef DEBUG
+#ifdef DEBUG_ITERATORS
 #define ITER_DEBUG_WRAP(iterator_name, pointer) iterator_name(this, pointer) 
 #else
 #define ITER_DEBUG_WRAP(iterator_name, pointer) iterator_name(pointer) 
@@ -234,7 +234,7 @@ namespace voxory
       template<typename T>
       CONSTEXPR bool is_zeroed(const T& val) {
         constexpr T zero{};
-        return std::memcmp(&val, &zero, sizeof(T));
+        return std::memcmp(&val, &zero, sizeof(T)) == 0;
       }
 
       template<typename Alloc, typename FwdIt>
@@ -377,7 +377,7 @@ namespace voxory
         using pointer = typename std::allocator_traits<Alloc>::pointer;
         using it_value = typename std::iterator_traits<FwdIt>::value_type;
         static_assert(std::is_same_v<it_value, value_type>, "Iterator value_type must match allocator value_type");
-
+        
         if constexpr (type_traits::use_memset_value_construct_v<FwdIt>) {
           // assume contiguous / pointer-like: get raw pointers
           pointer src_raw = unfancy(unwrap(first));
@@ -393,6 +393,9 @@ namespace voxory
           }
         }
         else {
+          if constexpr (type_traits::use_zero_memset_value_construct_v<FwdIt>) {
+
+          }
           // generic safe path for forward iterators
           construct_helper<Alloc> c(alloc, unfancy(unwrap(first)));
           pointer it = unfancy(unwrap(first));

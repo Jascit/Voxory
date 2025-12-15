@@ -8,32 +8,36 @@
 namespace voxory {
   namespace containers {
     namespace debug {
-      //TODO: правильно визначити конструктори та оператори
+      class iterator_base_dbg;
       class container_base_dbg {
-      public:
-        container_base_dbg& operator=(container_base_dbg&& o);
+      public: 
+        using list = list<iterator_base_dbg*> ;
+        container_base_dbg() noexcept(std::is_nothrow_default_constructible_v<list>) = default;
+        container_base_dbg(const container_base_dbg& o) noexcept(std::is_nothrow_default_constructible_v<list>) : container_base_dbg() {}; // no work to do
+        container_base_dbg(container_base_dbg&& o) noexcept(noexcept(std::declval<list&>() = std::move(std::declval<list&>())));
         void release_proxy() noexcept;
+        void lock() noexcept;
+        void unlock() noexcept;
         void swap_proxies(container_base_dbg& o);
         void move_proxies(container_base_dbg& o);
-        void lock();
-        void unlock();
 
         list list_;
         multithreading::spin_lock sl_;
         std::atomic<uint32_t> ver_;
       };
 
+      //TODO: правильно визначити конструктори та оператори
       class iterator_base_dbg {
       public:
-        const container_base_dbg* container_ = nullptr;
-        node* proxy_ = nullptr;
         iterator_base_dbg(const iterator_base_dbg& o);
-        iterator_base_dbg(iterator_base_dbg&& o) {};
+        iterator_base_dbg(iterator_base_dbg&& o);
         iterator_base_dbg(container_base_dbg* container);
         iterator_base_dbg(const container_base_dbg* container);
-        iterator_base_dbg& operator=(const iterator_base_dbg& o) { return *this; };
-        iterator_base_dbg& operator=(iterator_base_dbg&& o);
-        void release_on_destroy();
+        void release();
+        void copy_proxy(const iterator_base_dbg& o);
+
+        const container_base_dbg* container_ = nullptr;
+        container_base_dbg::list::node_type* proxy_ = nullptr;
       private:
         void register_to_container(const container_base_dbg* container);
       };
