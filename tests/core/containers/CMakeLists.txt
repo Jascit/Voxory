@@ -9,48 +9,23 @@ message(STATUS "TEST_DETAILS_PATH='${TEST_DETAILS_PATH}'")
 if(NOT TESTS_CORE_CONTAINERS_SOURCES)
     message(WARNING "CORE_MODULE_CONTAINERS_TEST: no source files found, skipping CORE_MODULE_CONTAINERS_TESTS")
 else()
-
     add_library(CORE_MODULE_CONTAINERS_TESTS OBJECT ${TESTS_CORE_CONTAINERS_SOURCES})
     target_include_directories(CORE_MODULE_CONTAINERS_TESTS PUBLIC
         ${CORE_INCLUDES}
         ${TEST_DETAILS_PATH}
     )
     
-    # --- C++ standard (застосується до OBJECT target)
     target_compile_features(CORE_MODULE_CONTAINERS_TESTS PUBLIC cxx_std_23)
-    
-    # --- Common compile definitions (передаються при компіляції об'єктів)
     target_compile_definitions(CORE_MODULE_CONTAINERS_TESTS PUBLIC
         $<$<CONFIG:Release>:NDEBUG>
     )
     
-    # --- Platform/compiler-specific compile options
-    if(MSVC)
-        target_compile_options(CORE_MODULE_CONTAINERS_TESTS PRIVATE
-            $<$<CONFIG:Release>:
-                /O2
-                /Ot
-                /Oi
-                /GL
-                /fp:fast
-            >
-        )
-    else()
-        target_compile_options(CORE_MODULE_CONTAINERS_TESTS PRIVATE
-            $<$<CONFIG:Release>:
-                -O3
-                -march=native
-                -mtune=native
-                -funroll-loops
-                -fstrict-aliasing
-                -ffast-math
-                -fno-exceptions
-                -fno-rtti
-            >
-        )
+    # apply common flags and sanitizer-compile flags
+    target_link_libraries(CORE_MODULE_CONTAINERS_TESTS PRIVATE COMMON_FLAGS)
+    if(TARGET SANITIZERS)
+      target_link_libraries(CORE_MODULE_CONTAINERS_TESTS PRIVATE SANITIZERS)
     endif()
-
-    target_link_libraries(CORE_MODULE_CONTAINERS_TESTS PRIVATE CoreModule)
+    target_link_libraries(CORE_MODULE_CONTAINERS_TESTS PRIVATE ${CORE_MODULE_TEST})
 
     if(TARGET CORE_MODULE_CONTAINERS_TESTS)
         message(STATUS "CORE_MODULE_CONTAINERS_TEST: [SUCCESS] created CORE_MODULE_CONTAINERS_TESTS")

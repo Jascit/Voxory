@@ -110,7 +110,6 @@ namespace voxory {
           return *(ptr_ + off);
         }
 
-      protected:
         pointer ptr_;
       };
 
@@ -219,9 +218,9 @@ namespace voxory {
     struct debug_policy {
       using value_type = T;
       using pointer = Ptr;
-      using const_pointer = const Ptr;
+      using const_pointer = std::add_pointer_t<std::add_const_t<T>>;
       using reference = T&;
-      using const_reference = reference;
+      using const_reference = const T&;
       using size_type = Sz;
       using allocator_type = Alloc;
       using allocator = Alloc;
@@ -240,6 +239,8 @@ namespace voxory {
       using FirstZeroSecondArgs = utility::detail::FirstZeroSecondArgs;
     public:
       using value_type = typename Policy::value_type;
+      using reference = value_type&;
+      using const_reference = const reference;
       using pointer = typename Policy::pointer;
       using size_type = typename Policy::size_type;
       using cleanup_guard = internal::cleanup_guard<heap_array>;
@@ -297,9 +298,6 @@ namespace voxory {
         auto& al = get_allocator();
         auto& o_al = o.get_allocator();
 
-        auto& data = pair_.second_;
-        auto& o_data = o.pair_.second_;
-
         if constexpr (allocator_traits::propagate_on_container_move_assignment::value) {
           cleanup();
           al = std::move(o_al);
@@ -332,8 +330,6 @@ namespace voxory {
         auto& al = get_allocator();
         auto& o_al = o.get_allocator();
 
-        auto& data = pair_.second_;
-        auto& o_data = o.pair_.second_;
 
         if constexpr (allocator_traits::propagate_on_container_copy_assignment::value) {
           //change allocator, allocate with copy ctor from new one
@@ -347,7 +343,7 @@ namespace voxory {
         return *this;
       };
 
-      value_type& operator[](size_t idx) noexcept {
+      reference operator[](size_t idx) noexcept {
 #ifdef DEBUG_ITERATORS
         ASSERT_ABORT(idx < size(), "heap_array index out of bounds");
 #endif // DEBUG_ITERATORS
@@ -355,8 +351,10 @@ namespace voxory {
         return pair_.second_.first[idx];
       };
 
-      value_type& operator[](size_t idx) const noexcept {
+      const_reference operator[](size_t idx) const noexcept {
+#ifdef DEBUG
         ASSERT_ABORT(idx < size(), "heap_array index out of bounds");
+#endif // DEBUG_ITERATORS
         return pair_.second_.first[idx];
       };
 
@@ -399,14 +397,14 @@ namespace voxory {
         }
       };
 
-      NODISCARD CONSTEXPR pointer at(size_t index) {
+      NODISCARD CONSTEXPR reference at(size_t index) {
         if (index >= size()) throw std::out_of_range("index out of range");
-        return std::addressof(pair_.second_.first[index]);
+        return pair_.second_.first[index];
       }
 
-      NODISCARD CONSTEXPR const pointer at(size_t index) const {
+      NODISCARD CONSTEXPR const_reference at(size_t index) const {
         if (index >= size()) throw std::out_of_range("index out of range");
-        return std::addressof(pair_.second_.first[index]);
+        return pair_.second_.first[index];
       }
 
       NODISCARD CONSTEXPR iterator begin() noexcept {
@@ -434,8 +432,23 @@ namespace voxory {
         return ITER_DEBUG_WRAP(const_iterator, pair_.second_.first);
       };
 
+      CONSTEXPR void shrink_to_fit() {
+        size_type current_size = size();
+        if (current_size < capacity_) {
+          if (current_size == 0) {
+            cleanup();
+            return;
+          }
+          reallocate(current_size);
+        }
+      }
+
     private:
-      CONSTEXPR inline heap_array& steal_no_cleanup(heap_array& o) noexcept(noexcept(move_proxies(std::declval<heap_array&>()))) {
+      CONSTEXPR inline heap_array& steal_no_cleanup(heap_array& o) noexcept(
+#ifdef DEBUG_ITERATORS
+        noexcept(move_proxies(std::declval<heap_array&>())) &&
+#endif // DEBUG_ITERATORS
+        true) {
         pair_.second_.first = std::exchange(o.pair_.second_.first, nullptr);
         pair_.second_.second = std::exchange(o.pair_.second_.second, nullptr);
         capacity_ = std::exchange(o.capacity_, 0);
@@ -445,18 +458,7 @@ namespace voxory {
         return *this;
         };
 
-      CONSTEXPR void cleanup_and_reserve_with_grow() {
-        auto& data = pair_.second_;
-        auto& first = data.first;
-        auto& last = data.second;
-
-        size_type new_capacity = grow_policy::calculate_grow(capacity_);
-
-        cleanup();
-        allocate_buffer(new_capacity);
-      };
-
-      NODISCARD CONSTEXPR void reallocate(size_type new_capacity) {
+      CONSTEXPR void reallocate(size_type new_capacity) {
         auto& data = pair_.second_;
         auto& alloc = get_allocator();
         auto& first = data.first;
@@ -486,35 +488,30 @@ namespace voxory {
         capacity_ = new_capacity;
       };
 
-      CONSTEXPR void resize_buffer(size_type new_capacity)  {
-        if (new_capacity == capacity_) return;
-
+      CONSTEXPR void resize_reallocate(size_type new_capacity) {
         auto& data = pair_.second_;
         auto& alloc = get_allocator();
         auto& first = data.first;
         auto& last = data.second;
 
-        if (new_capacity > capacity_) {
-          reallocate(new_capacity);
-          return;
-        }
-        size_type to_move = std::min(size(), new_capacity);
         pointer new_data = alloc.allocate(new_capacity);
         pointer new_last = new_data;
-
         internal::realloc_guard<allocator_type> guard(alloc, new_data, new_capacity);
         if (first != nullptr)
         {
-          //guard, if exception occurs during move/copy: destroy new_data, leave old intact
+          //guard, if exception occurs during move: destroy new_data, leave old intact
           if constexpr (noexcept(internal::uninitialized_move(std::declval<pointer>(), std::declval<pointer>(), std::declval<pointer>(), std::declval<allocator_type&>())))
           {
-            new_last = internal::uninitialized_move(first, first + to_move, new_data, alloc);
+            new_last = internal::uninitialized_move(first, last, new_data, alloc);
           }
           else
           {
-            new_last = internal::uninitialized_copy(first, first + to_move, new_data, alloc);
+            new_last = internal::uninitialized_copy(first, last, new_data, alloc);
           }
         }
+        size_type old_size = static_cast<size_type>(last - first);
+        size_type to_construct = new_capacity > old_size ? (new_capacity - old_size) : 0;
+        new_last = internal::uninitialized_default_construct_n(new_last, to_construct, alloc);
         guard.release();
 
         cleanup();
@@ -522,6 +519,41 @@ namespace voxory {
         first = new_data;
         last = new_last;
         capacity_ = new_capacity;
+      };
+
+      CONSTEXPR void resize_buffer(size_type new_size)  {
+        if (new_size == capacity_) return;
+
+        auto& data = pair_.second_;
+        auto& alloc = get_allocator();
+        auto& first = data.first;
+        auto& last = data.second;
+
+        size_type old_size = size();
+
+        if (new_size > capacity_) {
+          resize_reallocate(new_size);
+          return;
+        }
+        else if (new_size < capacity_) {
+          if (new_size < old_size) {
+            size_type to_destroy = old_size - new_size;
+            pointer new_last = last - to_destroy;
+            destroy_range(new_last, last);
+            last = new_last;
+#ifdef DEBUG_ITERATORS
+            invalidate_range(first, last);
+#endif // DEBUG_ITERATORS
+          }
+          else if (new_size > old_size) {
+            size_type to_construct = new_size - old_size;
+            pointer new_last = last + to_construct;
+            last = internal::uninitialized_default_construct(last, new_last, alloc);
+#ifdef DEBUG_ITERATORS
+            invalidate_range(first, last);
+#endif // DEBUG_ITERATORS
+          }
+        }
         return;
       };
 
@@ -625,7 +657,7 @@ namespace voxory {
 
         auto& first = data.first;
         auto& last = data.second;
-        pointer end = first + capacity_;
+
         constexpr uint8_t args_count = sizeof...(Args);
         if (count != 0)
         {
@@ -635,7 +667,7 @@ namespace voxory {
             last = internal::uninitialized_default_construct_n(first, count, alloc);
           }
           else if constexpr (args_count == 1) {
-            last = internal::uninitialized_fill_n(first, capacity_, std::forward<Args>(args)..., alloc);
+            last = internal::uninitialized_fill_n(first, count, std::forward<Args>(args)..., alloc);
           }
           else if constexpr (args_count == 2) {
             last = internal::uninitialized_copy(std::forward<Args>(args)..., first, alloc);
@@ -679,6 +711,9 @@ namespace voxory {
             mid = internal::uninitialized_move_n(o_first + common, rest, mid, alloc);
             last = mid;
           }
+#ifdef DEBUG_ITERATORS
+          invalidate_range(first, last);
+#endif // DEBUG_ITERATORS
           return;
         }
         // copy/move-assign within existing buffer, destroy rest
@@ -696,9 +731,31 @@ namespace voxory {
             destroy_range(mid, mid + rest);
             last = mid;
           }
+#ifdef DEBUG_ITERATORS
+          if (rest != 0) {
+            invalidate_range(first, last);
+          }
+#endif // DEBUG_ITERATORS
+          return;
         }
       }
-
+#ifdef DEBUG_ITERATORS
+      CONSTEXPR void invalidate_range(pointer first, pointer last) noexcept {
+        lock();
+        list::node_type* current = list_.data();
+        while(current != nullptr)
+        {
+          list::node_type* next = current->next_;
+          if (reinterpret_cast<const_iterator*>(current->data_)->ptr_ < first || reinterpret_cast<const_iterator*>(current->data_)->ptr_ > last)
+          {
+            current->data_->proxy_ = nullptr;
+            list_.pop_at(current);
+          }
+          current = next;
+        }
+        unlock();
+      }
+#endif // DEBUG_ITERATORS
     protected:
       utility::compressed_pair<allocator_type, std::pair<pointer, pointer>> pair_;
       size_type capacity_;

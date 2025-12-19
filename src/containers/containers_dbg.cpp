@@ -27,7 +27,9 @@ void container_base_dbg::move_proxies(container_base_dbg& o) {
 void container_base_dbg::lock() noexcept {
   uint32_t old_ver = ver_.load(std::memory_order_acquire);
   sl_.lock();
+#ifdef DEBUG
   ASSERT_ABORT(old_ver == ver_.load(std::memory_order_acquire), "");
+#endif // DEBUG_ITERATORS
 };
 
 void container_base_dbg::unlock() noexcept {

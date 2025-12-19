@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.25)
-
 project(NoyxTests LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+option(ENABLE_SANITIZERS "Enable Address/Undefined behavior sanitizers for Debug builds" ON)
 
 enable_testing()
 
@@ -12,16 +13,13 @@ set(TESTS_ALL_LIBRARIES_DYNAMIC "")
 set(TEST_SUBDIRECTORIES "")
 
 set(CORE_TEST_FLAG ON)
-
-foreach(CORE)
-    if(${MOD}_TEST_FLAG)
+set(AVAILABLE_TEST_MODULES CORE OTHER_MODULE)
+foreach(MOD IN LISTS AVAILABLE_TEST_MODULES)
+    set(FLAG_NAME "${MOD}_TEST_FLAG")
+    if(DEFINED ${FLAG_NAME} AND ${FLAG_NAME})
         list(APPEND TEST_SUBDIRECTORIES ${MOD})
     endif()
 endforeach()
-
-if(CORE_TEST_FLAG)
-  list(APPEND TEST_SUBDIRECTORIES CORE)
-endif()
 
 message(STATUS "------TOP_TEST CMAKE------")
 foreach(SUBDIR ${TEST_SUBDIRECTORIES})
@@ -34,33 +32,20 @@ foreach(SUBDIR ${TEST_SUBDIRECTORIES})
     endif()
 endforeach()
 
-
-add_executable (tests 
+# --- main test executable
+add_executable(tests
   "${CMAKE_CURRENT_SOURCE_DIR}/test_framework/test_main.cpp"
-) 
+)
 
-if(MSVC)
-    target_link_options(tests PRIVATE
-        $<$<CONFIG:Release>:
-            /LTCG
-            /OPT:REF
-            /OPT:ICF
-        >
-    )
-else()
-    target_link_options(tests PRIVATE
-        $<$<CONFIG:Release>:-flto>
-    )
+target_link_libraries(tests PRIVATE COMMON_FLAGS)
+if(TARGET SANITIZERS)
+  target_link_libraries(tests PRIVATE SANITIZERS)
 endif()
-# Ensure PIC (useful for shared builds / linking into shared libs)
-set_target_properties(tests PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_link_libraries(tests PRIVATE
-    ${TESTS_ALL_LIBRARIES_DYNAMIC}
-)
+if(TESTS_ALL_LIBRARIES_DYNAMIC)
+  target_link_libraries(tests PRIVATE ${TESTS_ALL_LIBRARIES_DYNAMIC})
+endif()
 
-target_include_directories(tests PUBLIC
-    ${TEST_DETAILS_PATH}
-)
+target_include_directories(tests PUBLIC ${TEST_DETAILS_PATH})
 
 add_test(NAME tests COMMAND tests)

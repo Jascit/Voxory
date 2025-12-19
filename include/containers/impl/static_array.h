@@ -236,7 +236,6 @@ namespace voxory {
       };
 
       static_array(const detail::static_array_base<value_type>& o) noexcept(noexcept(construct_range(std::declval<size_type>(), std::declval<pointer>(), std::declval<pointer>()))) {
-        size_type o_capacity = o.capacity();
         construct_range(o.capacity(), o.data(), o.data() + o.capacity());
       };
 
@@ -303,12 +302,16 @@ namespace voxory {
       };
 
       NODISCARD CONSTEXPR reference operator[](size_type idx) noexcept {
+#ifdef DEBUG
         ASSERT_ABORT(idx < capacity_, "static_array: out of range");
+#endif // DEBUG_ITERATORS
         return data()[idx];
       };
 
       NODISCARD CONSTEXPR const_reference operator[](size_type idx) const noexcept {
+#ifdef DEBUG
         ASSERT_ABORT(idx >= capacity_, "static_array: out of range");
+#endif // DEBUG_ITERATORS
         return data()[idx];
       };
 

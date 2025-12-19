@@ -60,7 +60,7 @@ namespace type_traits {
     std::conjunction_v<
     is_contiguous_iterator<It>,
     std::is_scalar<iter_value_t<It>>,
-    is_character<iter_value_t<It>>::value,
+    std::disjunction<is_character<iter_value_t<It>>, is_boolean<iter_value_t<It>>>,
     std::negation<std::is_volatile<std::remove_reference_t<iter_reference_t<It>>>>,
     std::negation<std::is_member_pointer<iter_value_t<It>>>
     >;

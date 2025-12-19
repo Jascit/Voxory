@@ -126,9 +126,9 @@ static inline void linux_abort_with_core() {
 #    if !defined(DEBUG)
 #      define DEBUG
 #    endif
-#  endif
-#  if !defined(DEBUG_ITERATORS)
-#    define DEBUG_ITERATORS
+#    if !defined(DEBUG_ITERATORS)
+#      define DEBUG_ITERATORS
+#    endif
 #  endif
 #endif // _MSC_VER
 
@@ -164,12 +164,12 @@ static inline void linux_abort_with_core() {
 #endif
 
 #ifdef X64
-  #ifndef mm_pause()
-    #define mm_pause() _mm_pause();
+  #ifndef mm_pause
+    #define mm_pause() _mm_pause()
   #endif // !mm_pause()
 #elif defined(X64_ARM)
-  #ifndef mm_pause()
-    #define mm_pause() _mm_pause();
+  #ifndef mm_pause
+    #define mm_pause() _mm_pause()
   #endif // !mm_pause()
 #endif // def X64
 

@@ -318,7 +318,6 @@ namespace voxory
         if constexpr (type_traits::use_memmove_copy_construct_v<FwdIt>) {
           // assume contiguous / pointer-like: get raw pointers
           pointer src_raw = unfancy(unwrap(first));
-          pointer src_end = src_raw + count;
           size_t bytes = count * sizeof(value_type);
           std::memmove(unfancy(dest), src_raw, bytes);
           dest += count;
@@ -475,7 +474,6 @@ namespace voxory
         if constexpr (type_traits::use_memmove_copy_construct_v<FwdIt>) {
           // assume contiguous / pointer-like: get raw pointers
           pointer src_raw = unfancy(unwrap(first));
-          pointer src_end = src_raw + count;
           size_t bytes = count * sizeof(value_type);
           std::memmove(unfancy(dest), src_raw, bytes);
           dest += count;

@@ -23,11 +23,24 @@ namespace voxory {
         CONSTEXPR ConstListIterator() noexcept : ptr_(nullptr) {}
         CONSTEXPR explicit ConstListIterator(node_pointer ptr) noexcept : ptr_(ptr) {}
 
-        CONSTEXPR reference operator*() const noexcept { ASSERT_ABORT(ptr_ != nullptr, ""); return ptr_->data_; }
-        CONSTEXPR const_pointer operator->() const noexcept { ASSERT_ABORT(ptr_ != nullptr, ""); return &ptr_->data_; }
+        CONSTEXPR reference operator*() const noexcept { 
+#ifdef DEBUG_ITERATORS
+          ASSERT_ABORT(ptr_ != nullptr, "");
+#endif // DEBUG_ITERATORS
+          return ptr_->data_; 
+        }
+        CONSTEXPR const_pointer operator->() const noexcept { 
+#ifdef DEBUG_ITERATORS
+          ASSERT_ABORT(ptr_ != nullptr, ""); 
+#endif // DEBUG_ITERATORS
+
+          return &ptr_->data_; 
+        }
 
         CONSTEXPR ConstListIterator& operator++() noexcept {
+#ifdef DEBUG_ITERATORS
           ASSERT_ABORT(ptr_ != nullptr, "");
+#endif // DEBUG_ITERATORS
           ptr_ = ptr_->next_;
           return *this;
         }
@@ -38,7 +51,9 @@ namespace voxory {
         }
 
         CONSTEXPR ConstListIterator& operator--() noexcept {
+#ifdef DEBUG_ITERATORS
           ASSERT_ABORT(ptr_ != nullptr, "");
+#endif // DEBUG_ITERATORS
           ptr_ = ptr_->last_;
           return *this;
         }
@@ -51,13 +66,17 @@ namespace voxory {
         CONSTEXPR ConstListIterator& operator+=(difference_type off) noexcept {
           if (off >= 0) {
             while (off--) {
+#ifdef DEBUG_ITERATORS
               ASSERT_ABORT(ptr_ != nullptr, "");
+#endif // DEBUG_ITERATORS
               ptr_ = ptr_->next_;
             }
           }
           else {
             while (off++) {
+#ifdef DEBUG_ITERATORS
               ASSERT_ABORT(ptr_ != nullptr, "");
+#endif // DEBUG_ITERATORS
               ptr_ = ptr_->last_;
             }
           }
@@ -80,10 +99,20 @@ namespace voxory {
         CONSTEXPR reference operator[](difference_type off) const noexcept {
           node_pointer tmp = ptr_;
           if (off >= 0) {
-            while (off--) { ASSERT_ABORT(tmp != nullptr, ""); tmp = tmp->next_; }
+            while (off--) { 
+#ifdef DEBUG_ITERATORS
+              ASSERT_ABORT(tmp != nullptr, ""); 
+#endif // DEBUG_ITERATORS
+              tmp = tmp->next_; 
+            }
           }
           else {
-            while (off++) { ASSERT_ABORT(tmp != nullptr, ""); tmp = tmp->last_; }
+            while (off++) { 
+#ifdef DEBUG_ITERATORS
+              ASSERT_ABORT(tmp != nullptr, ""); 
+#endif // DEBUG_ITERATORS
+              tmp = tmp->last_; 
+            }
           }
           return tmp->data_;
         }
@@ -218,9 +247,6 @@ namespace voxory {
         if (this == std::addressof(o)) return *this;
         auto& al = get_allocator();
         auto& o_al = o.get_allocator();
-
-        auto& data = pair_.second_;
-        auto& o_data = o.pair_.second_;
 
         if constexpr (allocator_traits::propagate_on_container_move_assignment::value) {
           clear();
@@ -370,7 +396,7 @@ namespace voxory {
       }
 
       template<typename U>
-      NODISCARD CONSTEXPR node_type* emplace_back(U&& val) {
+      CONSTEXPR node_type* emplace_back(U&& val) {
         pointer p = pair_.first().allocate(1);
         // placement new з повною ініціалізацією last_:
         new (p) node_type(std::forward<U>(val), nullptr, pair_.second_.second);

@@ -1,5 +1,16 @@
 #include <tests_details.h>
 #include <chrono>
+#if defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+#    pragma message("ASAN: __has_feature(address_sanitizer) == 1")
+#  else
+#    pragma message("ASAN: __has_feature(address_sanitizer) == 0")
+#  endif
+#elif defined(__SANITIZE_ADDRESS__)
+#  pragma message("ASAN: __SANITIZE_ADDRESS__ defined")
+#else
+#  pragma message("ASAN: NOT enabled")
+#endif
 
 int main() {
   auto& registry = TestRegistry::instance().getRegistry();

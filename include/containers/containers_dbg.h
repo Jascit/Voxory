@@ -13,7 +13,7 @@ namespace voxory {
       public: 
         using list = list<iterator_base_dbg*> ;
         container_base_dbg() noexcept(std::is_nothrow_default_constructible_v<list>) = default;
-        container_base_dbg(const container_base_dbg& o) noexcept(std::is_nothrow_default_constructible_v<list>) : container_base_dbg() {}; // no work to do
+        container_base_dbg(const container_base_dbg&) noexcept(std::is_nothrow_default_constructible_v<list>) : container_base_dbg() {}; // no work to do
         container_base_dbg(container_base_dbg&& o) noexcept(noexcept(std::declval<list&>() = std::move(std::declval<list&>())));
         void release_proxy() noexcept;
         void lock() noexcept;
@@ -42,20 +42,29 @@ namespace voxory {
         void register_to_container(const container_base_dbg* container);
       };
 
+      class container_base_rls;
       class iterator_base_rls {
       public:
-        iterator_base_rls(container_base_dbg* container) noexcept {};
-        iterator_base_rls(const container_base_dbg* container) noexcept {};
-        FORCE_INLINE void release_on_destroy() noexcept {};
+        iterator_base_rls(const iterator_base_rls&) noexcept {};
+        iterator_base_rls(iterator_base_rls&&) noexcept {};
+        iterator_base_rls(container_base_rls*) noexcept {};
+        iterator_base_rls(const container_base_rls*) noexcept {};
+        FORCE_INLINE void release() noexcept {};
+        FORCE_INLINE void copy_proxy(const iterator_base_rls&) noexcept {};
+      private:
+        FORCE_INLINE void register_to_container(const container_base_rls*) noexcept {};
       };
 
       class container_base_rls {
       public:
-        FORCE_INLINE void move_proxies(container_base_dbg&) noexcept {}
-        FORCE_INLINE void swap_proxies(container_base_dbg&) noexcept {}
-        FORCE_INLINE void release_proxy() noexcept {}
-        FORCE_INLINE void lock() noexcept {}
-        FORCE_INLINE void unlock() noexcept {}
+        container_base_rls() noexcept {};
+        container_base_rls(const container_base_rls&) noexcept {}; // no work to do
+        container_base_rls(container_base_rls&&) noexcept {};
+        FORCE_INLINE void release_proxy() noexcept {};
+        FORCE_INLINE void lock() noexcept {};
+        FORCE_INLINE void unlock() noexcept {};
+        FORCE_INLINE void swap_proxies(container_base_dbg&) noexcept {};
+        FORCE_INLINE void move_proxies(container_base_dbg&) noexcept {};
       };
     }
 #ifdef DEBUG_ITERATORS
