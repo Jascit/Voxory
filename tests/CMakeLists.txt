@@ -47,5 +47,10 @@ if(TESTS_ALL_LIBRARIES_DYNAMIC)
 endif()
 
 target_include_directories(tests PUBLIC ${TEST_DETAILS_PATH})
+message(STATUS "TEST: Test's binary dir: ${CMAKE_BINARY_DIR}/bin/tests")
+set_target_properties(tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin/tests
+    RUNTIME_OUTPUT_DIRECTORY_REALEASE ${CMAKE_BINARY_DIR}/bin/tests
+)
 
 add_test(NAME tests COMMAND tests)

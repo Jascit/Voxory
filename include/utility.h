@@ -1,5 +1,4 @@
 #pragma once
-#include <type_traits>
 #include <xmemory>
 #include <type_traits.h>
 

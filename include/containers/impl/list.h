@@ -199,7 +199,7 @@ namespace voxory {
       using const_iterator = detail::ConstListIterator<list>;
       using size_type = std::size_t;
 
-      list(allocator_type alloc = allocator_type()) noexcept(std::is_nothrow_default_constructible_v<allocator_type>) : pair_(FirstOneSecondArgs{}, alloc) {};
+      list(allocator_type alloc = allocator_type()) noexcept(std::is_nothrow_default_constructible_v<allocator_type>) : pair_(FirstOneSecondArgs{}, alloc), size_(0) {};
 
       explicit list(size_t n, allocator_type alloc = allocator_type())
         : pair_(FirstOneSecondArgs{}, alloc, std::pair<pointer, pointer>{nullptr, nullptr}), size_(0)

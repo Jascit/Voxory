@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(WINDOWS)
   // Windows 64-bit
 #include <windows.h>
 #define WINDOWS
@@ -16,20 +16,19 @@
 // other Apple platform
 #endif
 
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(LINUX)
 #define LINUX
 #else
 #error "Unknown platform"
 #endif
 
-#if defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64)
+#if defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) || defined(ARCH_X64)
 #define X64
 #elif defined(__aarch64__) || defined(_M_ARM64)
 #define X64_ARM
 #else
 #error "unsupported architecture"
 #endif
-#pragma once
 
 #include <cstdlib>
 #include <cstdio>
@@ -73,7 +72,7 @@ static inline void linux_abort_with_core() {
 #include <crtdbg.h>
 
 #define report_debug(level, file, line, fmt, ...) \
-      _CrtDbgReport(level, file, line, fmt, __VA_ARGS__)
+      _CrtDbgReport(level, file, line, fmt, ##__VA_ARGS__)
 #else
 #include <cstdio>
 #define report_debug(level, file, line, fmt, ...) do { \
@@ -172,4 +171,3 @@ static inline void linux_abort_with_core() {
     #define mm_pause() _mm_pause()
   #endif // !mm_pause()
 #endif // def X64
-

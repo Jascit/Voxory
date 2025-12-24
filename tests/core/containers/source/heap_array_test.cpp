@@ -13,12 +13,11 @@
 #include <random>
 #include <atomic>
 
-using voxory::containers::debug_policy;
 using voxory::containers::heap_array;
 
 // Test 1: basic construct, capacity, data, operator[], begin/end
-void heap_array_test_basic_int_behavior() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, basic_int_behavior) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
   constexpr size_t N = 8;
   heap_t a(N); // default-constructed elements
@@ -42,9 +41,9 @@ void heap_array_test_basic_int_behavior() {
 }
 
 // Test 2: construct with fill value (value ctor)
-void heap_array_test_construct_with_value() {
-  using policy_t = debug_policy<int>;
-  using heap_t = heap_array<policy_t>;
+NOYX_TEST(heap_array_test, construct_with_value) {
+  using policy_t = int;
+  using heap_t = heap_array<policy_t, std::allocator<policy_t>>;
   constexpr size_t N = 5;
   heap_t a(N, 42); // fill with 42 via rvalue ctor
   NOYX_ASSERT_EQ(a.size(), (heap_t::size_type)N);
@@ -52,8 +51,8 @@ void heap_array_test_construct_with_value() {
 }
 
 // Test 3: at() bounds checking
-void heap_array_test_at_throws() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, at_throws) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
   heap_t a(3);
   NOYX_ASSERT_EQ(a.size(), (heap_t::size_type)3);
@@ -71,8 +70,8 @@ void heap_array_test_at_throws() {
 }
 
 // Test 4: copy-constructor deep copy
-void heap_array_test_copy_constructor_deep_strings() {
-  using policy_t = debug_policy<std::string>;
+NOYX_TEST(heap_array_test, copy_constructor_deep_strings) {
+  using policy_t = std::string;
   using heap_t = heap_array<policy_t>;
   constexpr size_t N = 4;
   heap_t src(N);
@@ -85,8 +84,8 @@ void heap_array_test_copy_constructor_deep_strings() {
 }
 
 // Test 5: copy-assignment
-void heap_array_test_copy_assignment() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, copy_assignment) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
   constexpr size_t N = 6;
   heap_t a(N);
@@ -101,8 +100,8 @@ void heap_array_test_copy_assignment() {
 }
 
 // Test 6: move-constructor and move-assignment
-void heap_array_test_move_semantics_strings() {
-  using policy_t = debug_policy<std::string>;
+NOYX_TEST(heap_array_test, move_semantics_strings) {
+  using policy_t = std::string;
   using heap_t = heap_array<policy_t>;
   constexpr size_t N = 3;
   heap_t a(N);
@@ -124,8 +123,8 @@ void heap_array_test_move_semantics_strings() {
 }
 
 // Test 7: iterators random access & arithmetic
-void heap_array_test_iterators_arithmetic() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, iterators_arithmetic) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
   constexpr size_t N = 12;
   heap_t a(N);
@@ -146,8 +145,8 @@ void heap_array_test_iterators_arithmetic() {
 }
 
 // Test 8: reserve / resize behaviour
-void heap_array_test_reserve_and_resize() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, reserve_and_resize) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
   heap_t a(4);
   for (size_t i = 0; i < 4; ++i) a[(heap_t::size_type)i] = (int)(i + 1);
@@ -167,8 +166,8 @@ void heap_array_test_reserve_and_resize() {
 }
 
 // Test 9: zero-sized heap_array behaviour
-void heap_array_test_zero_size() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, zero_size) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
   heap_t z(0);
   NOYX_ASSERT_EQ(z.capacity(), (heap_t::size_type)0);
@@ -179,8 +178,8 @@ void heap_array_test_zero_size() {
 }
 
 // Test 10: swap
-void heap_array_test_swap() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, swap) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
   constexpr size_t N = 4;
   heap_t a(N);
@@ -199,8 +198,8 @@ void heap_array_test_swap() {
   NOYX_ASSERT_EQ(b[(heap_t::size_type)0], a0);
 }
 
-void heap_array_test_smoke() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, smoke) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
   heap_t a(1);
@@ -217,8 +216,8 @@ void heap_array_test_smoke() {
   NOYX_ASSERT_EQ(a[0], 123);
 }
 
-void heap_array_test_self_copy_assignment() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, self_copy_assignment) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
   heap_t a(5);
@@ -231,14 +230,14 @@ void heap_array_test_self_copy_assignment() {
     NOYX_ASSERT_EQ(a[i], (int)i);
 }
 
-void heap_array_test_self_move_assignment() {
-  using policy_t = debug_policy<std::string>;
+NOYX_TEST(heap_array_test, self_move_assignment) {
+  using policy_t = std::string;
   using heap_t = heap_array<policy_t>;
 
   heap_t a(3);
   a[0] = "a"; a[1] = "b"; a[2] = "c";
 
-  a = std::move(a); 
+  a = std::move(a);
 
   NOYX_ASSERT_EQ(a.size(), 3);
   NOYX_ASSERT_EQ(a[0], "a");
@@ -247,8 +246,8 @@ void heap_array_test_self_move_assignment() {
 }
 
 
-void heap_array_test_const_access() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, const_access) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
   heap_t a(4);
@@ -267,8 +266,8 @@ void heap_array_test_const_access() {
   NOYX_ASSERT_EQ(cnt, 4);
 }
 
-void heap_array_test_stress_large() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, stress_large) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
   constexpr size_t N = 1'000'000;
@@ -284,8 +283,8 @@ void heap_array_test_stress_large() {
   NOYX_ASSERT_TRUE(checksum != 0);
 }
 
-void heap_array_test_multiple_reserve_preserves_data() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, multiple_reserve_preserves_data) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
   heap_t a(2);
@@ -299,8 +298,8 @@ void heap_array_test_multiple_reserve_preserves_data() {
   }
 }
 
-void heap_array_test_resize_to_zero_and_back() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, resize_to_zero_and_back) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
   heap_t a(5);
@@ -316,8 +315,8 @@ void heap_array_test_resize_to_zero_and_back() {
   NOYX_ASSERT_EQ(a.capacity(), 5);
 }
 
-void heap_array_test_stress_iterators_multithreaded() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, stress_iterators_multithreaded) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
   constexpr heap_t::size_type N = 10'000;
@@ -369,8 +368,8 @@ void heap_array_test_stress_iterators_multithreaded() {
   for (auto& th : ths) th.join();
 }
 
-void heap_array_test_stress_alloc_dealloc_multithreaded() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, stress_alloc_dealloc_multithreaded) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
   unsigned hc = std::thread::hardware_concurrency();
@@ -406,11 +405,11 @@ void heap_array_test_stress_alloc_dealloc_multithreaded() {
   for (auto& th : ths) th.join();
 }
 
-void heap_array_test_stress_alloc_dealloc_singlethreaded() {
-  using policy_t = debug_policy<int>;
+NOYX_TEST(heap_array_test, stress_alloc_dealloc_singlethreaded) {
+  using policy_t = int;
   using heap_t = heap_array<policy_t>;
 
-  const size_t iters = 3000 * 8;               
+  const size_t iters = 3000 * 8;
   const heap_t::size_type max_size = 2000;
 
   std::mt19937_64 rng(static_cast<unsigned long long>(std::random_device{}()));
@@ -436,69 +435,153 @@ void heap_array_test_stress_alloc_dealloc_singlethreaded() {
   }
 }
 
+NOYX_TEST(heap_array_test, non_trivial_lifetime_counts) {
+  std::atomic<int> live{ 0 };
 
-void heap_array_test_shrink_to_fit_behavior() {
-  using policy_t = debug_policy<int>;
-  using heap_t = heap_array<policy_t>;
+  struct Tracer {
+    std::atomic<int>* live_;
+    Tracer(std::atomic<int>* l = nullptr) noexcept : live_(l) { if (live_) live_->fetch_add(1); }
+    Tracer(const Tracer& o) noexcept : live_(o.live_) { if (live_) live_->fetch_add(1); }
+    Tracer(Tracer&& o) noexcept : live_(o.live_) { if (live_) live_->fetch_add(1); o.live_ = nullptr; }
+    Tracer& operator=(const Tracer&) = default;
+    Tracer& operator=(Tracer&& o) noexcept { if (this != &o) { live_ = o.live_; o.live_ = nullptr; } return *this; }
+    ~Tracer() { if (live_) live_->fetch_sub(1); }
+  };
 
-  // start with a known capacity
-  constexpr heap_t::size_type initial_cap = 100;
-  heap_t a(initial_cap);
-  for (heap_t::size_type i = 0; i < initial_cap; ++i) a[i] = static_cast<int>(i);
+  {
+    using heap_t = heap_array<Tracer>;
+    // створюємо через value-конструктор щоб всі елементи знали куди рахувати
+    heap_t a(5, Tracer(&live));
+    NOYX_ASSERT_EQ(live.load(), 5);
+  }
+  // після виходу з області видимості всі деструктори повинні були виклинатись
+  NOYX_ASSERT_EQ(live.load(), 0);
+}
 
-  NOYX_ASSERT_EQ(a.capacity(), (heap_t::size_type)initial_cap);
-  // resize smaller: should not reduce capacity_
+NOYX_TEST(heap_array_test, value_constructor_nontrivial) {
+  std::atomic<int> live{ 0 };
+  std::atomic<int> copies{ 0 };
+  std::atomic<int> moves{ 0 };
+
+  struct Tracer2 {
+    std::atomic<int>* live_;
+    std::atomic<int>* copies_;
+    std::atomic<int>* moves_;
+    int payload;
+    Tracer2(std::atomic<int>* l = nullptr, std::atomic<int>* c = nullptr, std::atomic<int>* m = nullptr, int p = 0) noexcept
+      : live_(l), copies_(c), moves_(m), payload(p) {
+      if (live_) live_->fetch_add(1);
+    }
+    Tracer2(const Tracer2& o) noexcept
+      : live_(o.live_), copies_(o.copies_), moves_(o.moves_), payload(o.payload) {
+      if (copies_) copies_->fetch_add(1);
+      if (live_) live_->fetch_add(1);
+    }
+    Tracer2(Tracer2&& o) noexcept
+      : live_(o.live_), copies_(o.copies_), moves_(o.moves_), payload(o.payload) {
+      if (moves_) moves_->fetch_add(1);
+      if (live_) live_->fetch_add(1);
+      o.live_ = nullptr; o.copies_ = nullptr; o.moves_ = nullptr;
+    }
+    ~Tracer2() { if (live_) live_->fetch_sub(1); }
+  };
+
+  using heap_t = heap_array<Tracer2>;
+  Tracer2 proto(&live, &copies, &moves, 123);
+  heap_t a(4, proto); 
+  NOYX_ASSERT_EQ(live.load(), 5);
+
+  NOYX_ASSERT_TRUE((copies.load() + moves.load()) >= 1);
+}
+
+NOYX_TEST(heap_array_test, resize_destroys_elements) {
+  std::atomic<int> live{ 0 };
+
+  struct R {
+    std::atomic<int>* live_;
+    int tag;
+    R(std::atomic<int>* l = nullptr, int t = 0) noexcept : live_(l), tag(t) { if (live_) live_->fetch_add(1); }
+    R(const R& o) noexcept : live_(o.live_), tag(o.tag) { if (live_) live_->fetch_add(1); }
+    R(R&& o) noexcept : live_(o.live_), tag(o.tag) { if (live_) live_->fetch_add(1); o.live_ = nullptr; }
+    ~R() { if (live_) live_->fetch_sub(1); }
+  };
+
+  using heap_t = heap_array<R>;
+  heap_t a(6, R(&live, 7)); 
+  NOYX_ASSERT_EQ(live.load(), 6);
+
+  a.resize(2); 
+  NOYX_ASSERT_EQ(live.load(), 2);
+
+}
+
+NOYX_TEST(heap_array_test, move_only_assignment) {
+  struct MoveOnly {
+    int v;
+    MoveOnly(int x = -1) noexcept : v(x) {}
+    MoveOnly(const MoveOnly&) = delete;
+    MoveOnly(MoveOnly&& o) noexcept : v(o.v) { o.v = -1; }
+    MoveOnly& operator=(const MoveOnly&) = delete;
+    MoveOnly& operator=(MoveOnly&& o) noexcept { v = o.v; o.v = -1; return *this; }
+  };
+
+  using heap_t = heap_array<MoveOnly>;
+  heap_t a; // заповнимо значеннями за замовчуванням
+  a.reserve(3);
   a.resize(10);
-  NOYX_ASSERT_EQ(a.size(), (heap_t::size_type)10);
-  // capacity must remain at least the initial capacity (i.e. not decreased by resize)
-  NOYX_ASSERT_TRUE(a.capacity() >= initial_cap);
-
-  // Now call shrink_to_fit() - expects capacity to be reduced to size (10)
-  a.shrink_to_fit();
-  NOYX_ASSERT_EQ(a.size(), (heap_t::size_type)10);
-  NOYX_ASSERT_EQ(a.capacity(), (heap_t::size_type)10);
-
-  // Values preserved
-  for (heap_t::size_type i = 0; i < a.size(); ++i) NOYX_ASSERT_EQ(a[i], (int)i);
+  for (size_t i = 0; i < 10; i++)
+  {
+    a[i] = MoveOnly(i*10);
+  }
+  NOYX_ASSERT_EQ(a[1].v, 10);
+  NOYX_ASSERT_EQ(a[2].v, 20);
+  NOYX_ASSERT_EQ(a[3].v, 30);
 }
 
 
-// grouping & runner
-NOYX_TEST(heap_array_test, unit_test) {
-  using clk = std::chrono::steady_clock;
-  using rep = std::chrono::duration<double, std::milli>;
+NOYX_TEST(heap_array_test, swap_preserves_resources) {
+  std::atomic<int> live{ 0 };
 
-  auto time_and_run = [&](auto&& fn, const char* name) {
-    auto s = clk::now();
-    fn();
-    auto e = clk::now();
-    rep d = e - s;
-    std::cout.setf(std::ios::fixed); std::cout << std::setprecision(3);
-    std::cout << "[TIMING] " << name << " : " << d.count() << " ms\n";
-    std::cout.unsetf(std::ios::fixed);
-    };
+  struct Resource {
+    std::atomic<int>* live_;
+    int id;
+    Resource(std::atomic<int>* l = nullptr, int i = -1) noexcept : live_(l), id(i) { if (live_) live_->fetch_add(1); }
+    Resource(const Resource& o) noexcept : live_(o.live_), id(o.id) { if (live_) live_->fetch_add(1); }
+    Resource(Resource&& o) noexcept : live_(o.live_), id(o.id) { if (live_) live_->fetch_add(1); o.live_ = nullptr; }
+    ~Resource() { if (live_) live_->fetch_sub(1); }
+  };
 
-  time_and_run(heap_array_test_basic_int_behavior, "basic_int_behavior");
-  time_and_run(heap_array_test_construct_with_value, "construct_with_value");
-  time_and_run(heap_array_test_at_throws, "at_throws");
-  time_and_run(heap_array_test_copy_constructor_deep_strings, "copy_constructor_deep_strings");
-  time_and_run(heap_array_test_copy_assignment, "copy_assignment");
-  time_and_run(heap_array_test_move_semantics_strings, "move_semantics_strings");
-  time_and_run(heap_array_test_iterators_arithmetic, "iterators_arithmetic");
-  time_and_run(heap_array_test_reserve_and_resize, "reserve_and_resize");
-  time_and_run(heap_array_test_zero_size, "zero_size");
-  time_and_run(heap_array_test_swap, "swap");
-  time_and_run(heap_array_test_smoke, "smoke");
-  time_and_run(heap_array_test_self_copy_assignment, "self_copy_assignment");
-  time_and_run(heap_array_test_self_move_assignment, "self_move_assignment");
-  time_and_run(heap_array_test_const_access, "const_access");
-  time_and_run(heap_array_test_stress_large, "stress_large");
-  time_and_run(heap_array_test_multiple_reserve_preserves_data, "multiple_reserve_preserves_data");
-  time_and_run(heap_array_test_resize_to_zero_and_back, "resize_to_zero_and_back");
+  using heap_t = heap_array<Resource>;
+  heap_t a(3, Resource(&live, 1));
+  heap_t b(3, Resource(&live, 100));
 
-  time_and_run(heap_array_test_stress_iterators_multithreaded, "stress_iterators_multithreaded");
-  time_and_run(heap_array_test_stress_alloc_dealloc_multithreaded, "stress_alloc_dealloc_multithreaded");
-  time_and_run(heap_array_test_shrink_to_fit_behavior, "shrink_to_fit_behavior");
-  time_and_run(heap_array_test_stress_alloc_dealloc_singlethreaded, "stress_alloc_dealloc_singlethreaded");
-  return;
+  // присвоїмо унікальні id щоб перевірити що swap міняє їх місцями
+  for (size_t i = 0; i < 3; ++i) {
+    a[i].id = static_cast<int>(10 + i);
+    b[i].id = static_cast<int>(200 + i);
+  }
+
+  NOYX_ASSERT_EQ(live.load(), 6);
+  std::swap(a, b);
+
+  // після swap id-и мають помінятися місцями
+  NOYX_ASSERT_EQ(a[0].id, 200);
+  NOYX_ASSERT_EQ(b[0].id, 10);
+
+  // при виході з функції живих ресурсів не повинно лишитись
+  // (це перевірить загальний runner/інші тести); тут лиш перевіримо поточний
+  NOYX_ASSERT_EQ(live.load(), 6);
+}
+
+NOYX_TEST(heap_array_test, one_alive_obj) {
+  struct Resource {
+    Resource() {
+      std::cout << std::endl << "i'm alive" << std::endl;
+    }
+    ~Resource() {
+      std::cout << "i'm dead" << std::endl;
+    }
+  };
+  using heap_t = heap_array<Resource>;
+  heap_t a(1);
 }

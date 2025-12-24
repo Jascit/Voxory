@@ -1,0 +1,9 @@
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*
+HeaderFilterRegex: 'Voxory\include.*'       
+SystemHeaders: false     
+WarningsAsErrors: ''  
+FormatStyle: none

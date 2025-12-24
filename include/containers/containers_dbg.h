@@ -1,5 +1,4 @@
 #pragma once
-#include <platform/platform.h>
 #include <utility.h>
 #include <multithreading/spin_lock.h>
 #include <mutex>
@@ -63,8 +62,8 @@ namespace voxory {
         FORCE_INLINE void release_proxy() noexcept {};
         FORCE_INLINE void lock() noexcept {};
         FORCE_INLINE void unlock() noexcept {};
-        FORCE_INLINE void swap_proxies(container_base_dbg&) noexcept {};
-        FORCE_INLINE void move_proxies(container_base_dbg&) noexcept {};
+        FORCE_INLINE void swap_proxies(container_base_rls&) noexcept {};
+        FORCE_INLINE void move_proxies(container_base_rls&) noexcept {};
       };
     }
 #ifdef DEBUG_ITERATORS

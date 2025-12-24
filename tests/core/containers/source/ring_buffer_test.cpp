@@ -1,11 +1,16 @@
-//#include <tests_details.h>
-//#include <containers/ring_buffer.h>
-//#include <iostream>
-//#include <memory>
-//#include <vector>
-//#include <string>
-//#include <type_traits>
-//#include <iomanip>
+#include <tests_details.h>
+#include <containers/impl/ring_buffer.h>
+#include <iostream>
+#include <memory>
+#include <vector>
+#include <string>
+#include <type_traits>
+#include <iomanip>
+
+NOYX_TEST(shitttt, sadsadad) {
+    voxory::containers::ring_buffer<int, std::allocator<int>> a;
+}
+
 //
 //using containers::ring_buffer;
 //

@@ -1,6 +1,5 @@
 #pragma once
 #include <type_traits>
-#include <optional>
 #include <platform/platform.h>
 
 namespace type_traits {
@@ -116,13 +115,7 @@ namespace type_traits {
 
   template<typename U>
   struct is_reference_wrapper<std::reference_wrapper<U>> : std::true_type{};
-   
-  template<typename T>
-  struct is_optional : std::false_type{};
-   
-  template<typename U>
-  struct is_optional<std::optional<U>> : std::true_type {};
-  
+
   template<typename T, typename...>
   NODISCARD CONSTEXPR auto first_arg(T&& arg, ...) noexcept -> decltype(auto) {
     return std::forward<T>(arg);
@@ -141,5 +134,28 @@ namespace type_traits {
 
   template<typename Alloc, typename Pointer>
   constexpr bool has_destroy_v = has_destroy<Alloc, Pointer>::value;
-  
+
+  template<typename Alloc, typename Pointer, typename... Args>
+  struct has_construct {
+  private:
+    template<typename A, typename P, typename... As>
+    static auto test(int) -> decltype(
+      std::declval<A&>().construct(std::declval<P>(), std::declval<As>()...), 
+      std::true_type{}   
+      );
+
+    template<typename, typename, typename...>
+    static std::false_type test(...);
+
+  public:
+    static constexpr bool value = decltype(test<Alloc, Pointer, Args...>(0))::value;
+  };
+
+  template<typename Alloc, typename Pointer, typename... Args>
+  constexpr bool has_construct_v = has_construct<Alloc, Pointer, Args...>::value;
+
+  template<std::size_t N, typename... Args>
+  decltype(auto) nth_arg(Args&&... args) {
+    return std::get<N>(std::forward_as_tuple(std::forward<Args>(args)...));
+  }
 } // namespace type_traits

@@ -1,8 +1,6 @@
 #pragma once 
-#include <type_traits>
-#include <type_traits.h>
-#include <xmemory>
 #include <utility.h>
+
 #ifdef DEBUG_ITERATORS
 #define ITER_DEBUG_WRAP(iterator_name, pointer) iterator_name(this, pointer) 
 #else
@@ -37,6 +35,8 @@ namespace voxory
       struct empty_data {};
       struct move_tag {};
       struct copy_tag {};
+      struct assign_tag {};
+      struct construct_tag {};
 
       template<typename Alloc>
       class construct_helper {
@@ -64,7 +64,13 @@ namespace voxory
 
         template<typename... Args>
         CONSTEXPR void construct_one(Args&&... args) noexcept(std::is_nothrow_constructible_v<value_type, Args...>) {
-          allocator_traits::construct(alloc_.get(), current_, std::forward<Args>(args)...);
+          if constexpr (type_traits::has_construct_v<allocator_type, pointer>)
+          {
+            alloc_.get().construct(current_, std::forward<Args>(args)...);
+          }
+          else {
+            std::construct_at(current_, std::forward<Args>(args)...);
+          }
           current_++;
         }
 
@@ -154,9 +160,6 @@ namespace voxory
           return wrap;
         }
         else if constexpr (type_traits::has_deref<Wrapper>::value) {
-          return std::addressof(*wrap);
-        }
-        else if constexpr (type_traits::is_optional<Wrapper>::value) {
           return std::addressof(*wrap);
         }
         else {
@@ -523,6 +526,35 @@ namespace voxory
           return dest;
         }
       }
+      template<typename Alloc, typename FwdIt>
+      constexpr bool is_nothrow_uninitialized_moveable_v = noexcept(internal::uninitialized_move(
+        std::declval<FwdIt>(), std::declval<FwdIt>(),
+        std::declval<typename std::allocator_traits<Alloc>::pointer>(), std::declval<Alloc&>()
+      ));
+      template<typename Alloc, typename FwdIt>
+      constexpr bool is_nothrow_uninitialized_copyable_v = noexcept(internal::uninitialized_copy(
+        std::declval<FwdIt>(), std::declval<FwdIt>(),
+        std::declval<typename std::allocator_traits<Alloc>::pointer>(), std::declval<Alloc&>()
+      ));
+      template<typename Alloc, typename FwdIt>
+      constexpr bool is_nothrow_uninitialized_fillable_v = noexcept(internal::uninitialized_fill(
+        std::declval<FwdIt>(), std::declval<FwdIt>(),
+        std::declval<typename std::allocator_traits<Alloc>::value_type&>(), std::declval<Alloc&>()
+      ));
+      template<typename Alloc, typename FwdIt>
+      constexpr bool is_nothrow_uninitialized_default_constructible_v = noexcept(internal::uninitialized_default_construct(
+        std::declval<FwdIt>(), std::declval<FwdIt>(), std::declval<Alloc&>()
+      ));
+      template<typename Alloc, typename FwdIt>
+      constexpr bool is_nothrow_copy_assignable_n_v = noexcept(internal::copy_assign_n(
+        std::declval<FwdIt>(), std::declval<typename std::allocator_traits<Alloc>::size_type>(),
+        std::declval<typename std::allocator_traits<Alloc>::pointer>(), std::declval<Alloc&>()
+      ));
+      template<typename Alloc, typename FwdIt>
+      constexpr bool is_nothrow_move_assignable_n_v = noexcept(internal::move_assign_n(
+        std::declval<FwdIt>(), std::declval<typename std::allocator_traits<Alloc>::size_type>(),
+        std::declval<typename std::allocator_traits<Alloc>::pointer>(), std::declval<Alloc&>()
+      ));
     }
   }
 }
