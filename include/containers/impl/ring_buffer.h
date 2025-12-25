@@ -56,15 +56,19 @@ namespace voxory {
         _allocate_buffer(capacity);
       };
 
-      ring_buffer(const ring_buffer&) = delete;
+      ring_buffer(const ring_buffer& o) : _pair(FirstOneSecondArgs{}, allocator_traits::select_on_container_copy_construction(o._pair.first())), _capacity(0) {
+        _allocate_buffer(o._capacity);
+        if (o._pair._second._size != 0)
+        {
+          _fill_uninitialized_from_ring(o, internal::copy_tag{});
+        }
+      };
       /**
        * @brief Constructs a ring_buffer from other obj. Strong guarantee.
        * @param o Other object to move in.
        */
       ring_buffer(ring_buffer&& o) noexcept : 
-        _pair(FirstOneSecondArgs{}, std::move(o.get_allocator()), std::move(o._pair._second)), _allow_overwrite(o._allow_overwrite), _capacity(o._capacity) {
-
-      };
+        _pair(FirstOneSecondArgs{}, std::move(o.get_allocator()), std::move(o._pair._second)), _allow_overwrite(o._allow_overwrite), _capacity(o._capacity) {};
       /**
        * @brief Dtor for the ring_buffer class.
        */
@@ -72,12 +76,29 @@ namespace voxory {
         _cleanup();
       };
 
-      ring_buffer& operator=(const ring_buffer&) = delete;
+      ring_buffer& operator=(const ring_buffer& o)  {
+        if (this == &o) return *this;
+        auto& this_alloc = get_allocator();
+        auto& o_alloc = o.get_allocator();
+
+        auto& this_data = _pair._second;
+        auto& o_data = o._pair._second;
+        if constexpr (allocator_traits::propagate_on_container_copy_assignment::value) {
+          //change allocator, allocate with copy ctor from new one
+          if (this_alloc != o_alloc) {
+            _cleanup();
+            this_alloc = o_alloc;
+          }
+        }
+        _assign(o, internal::copy_tag);
+        return *this;
+      };
+
       /**
-       * @brief Constructs a ring_buffer from other obj. Strong guarantee.
+       * @brief Constructs a ring_buffer from other obj. Basic-strong guarantee.
        * @param o Other object to move in.
        */
-      ring_buffer& operator=(ring_buffer&& o) noexcept {
+      ring_buffer& operator=(ring_buffer&& o) {
         if (this == &o) return *this;
         auto& this_alloc = get_allocator();
         auto& o_alloc = o.get_allocator();
@@ -289,8 +310,8 @@ namespace voxory {
         auto& first = data._first;
         auto& last = data._last;
         _destroy_range(first, last);
-        first = nullptr;
-        last = nullptr;
+        first = data._data;
+        last = data._data;
         data._size = 0;
       };
       
@@ -352,7 +373,8 @@ namespace voxory {
        * @param n The number of elements that have been constructed or written.
        */
       CONSTEXPR void commit_write(size_type n) noexcept {
-        _pair._second.last_ = _append(_pair._second.last_, n);
+        _pair._second._last = _append(_pair._second._last, n);
+        _pair._second._size += n;
       }
 
       /**
@@ -369,6 +391,7 @@ namespace voxory {
       CONSTEXPR void commit_read(size_type n) noexcept {
         _destroy_n(_pair._second._first, n);
         _pair._second._first = _append(_pair._second._first, n);
+        _pair._second._size-=n;
       }
 
       // --- helpers ---
@@ -408,15 +431,24 @@ namespace voxory {
       }
       //basic guarantee
       template<typename U>
-      CONSTEXPR void _emplace_back_overwrite(U&& val) noexcept(std::is_nothrow_assignable_v<value_type&, U>) {
+      CONSTEXPR void _emplace_back_overwrite(U&& val) noexcept(
+        (std::is_assignable_v<value_type&, U>) ?
+          std::is_nothrow_assignable_v<value_type&, U> :
+          std::conjunction_v<std::is_nothrow_destructible<value_type>, std::is_nothrow_convertible<value_type, U>>) 
+      {
         if (_pair._second._size != _capacity) return;
         auto& data = _pair._second;
+        auto& alloc = get_allocator();
         pointer first = data._first;
         pointer start = data._data;
         pointer end = start + _capacity;
-
-        *first = std::forward<U>(val);
-
+        if constexpr (std::is_assignable_v<value_type&, U>) {
+          *first = std::forward<U>(val);
+        }
+        else {//fallback
+          internal::destroy_at(first, alloc);
+          internal::construct_at(first, alloc, std::forward<U>(val));
+        }
         pointer next = first + 1;
         data._last = next;
         data._first = (next == end) ? start : next;
@@ -492,9 +524,11 @@ namespace voxory {
             guard.release();
           }
         }
+        _cleanup();
         this_data._data = new_data;
         this_data._first = new_data;
         this_data._last = new_last;
+        _capacity = new_capacity;
       }
 
       // if o_data._size == 0 then UB, must be verified at higher levels 
@@ -556,7 +590,8 @@ namespace voxory {
       // Consider creating internal classes Writer and Reader to manage span operations 
       // and ensure safe access to elements in the ring buffer.
       // strong guarantee
-      CONSTEXPR void _cleanup_and_move_source(ring_buffer& o) 
+      template<typename Tag>
+      CONSTEXPR void _release_and_transfer(ring_buffer& o, Tag&& t)
         noexcept(internal::is_nothrow_uninitialized_moveable_v<allocator_type, pointer> || 
                  internal::is_nothrow_uninitialized_copyable_v<allocator_type, pointer>) {
         auto& this_data = _pair._second;
@@ -569,7 +604,7 @@ namespace voxory {
         pointer o_end = o_start + o._capacity;
         size_type o_capacity = o._capacity;
 
-        if constexpr (internal::is_nothrow_uninitialized_moveable_v<allocator_type, pointer>)
+        if constexpr (internal::is_nothrow_uninitialized_moveable_v<allocator_type, pointer> && std::is_same_v<std::remove_cvref_t<Tag>, internal::move_tag>)
         {
           // move is noexcept, we don't need realloc_guard; just destroy old data and allocate new
           _cleanup(); // destroy old data, this_data._first/this_data._last = nullptr
@@ -595,8 +630,8 @@ namespace voxory {
           _capacity = o_capacity;
         }
       }
-
-      CONSTEXPR void _destroy_and_move_source(ring_buffer& o)
+      template<typename Tag>
+      CONSTEXPR void _destroy_and_transfer_source(ring_buffer& o, Tag&& t)
         noexcept(internal::is_nothrow_uninitialized_moveable_v<allocator_type, pointer> ||
                  internal::is_nothrow_uninitialized_copyable_v<allocator_type, pointer>) {
         auto& this_data = _pair._second;
@@ -608,7 +643,7 @@ namespace voxory {
         pointer o_start = o_data._data;
         pointer o_end = o_start + o._capacity;
         size_type o_capacity = o._capacity;
-        if constexpr (internal::is_nothrow_uninitialized_moveable_v<allocator_type, pointer>)
+        if constexpr (internal::is_nothrow_uninitialized_moveable_v<allocator_type, pointer> && std::is_same_v<std::remove_cvref_t<Tag>, internal::move_tag>)
         {
           // move is noexcept, we don't need realloc_guard; just destroy old data
           _destroy_range(this_data._first, this_data._last);
@@ -659,7 +694,7 @@ namespace voxory {
 
       template<typename Tag>
       // does not verify capacity of objects, should be done on higher levels
-      CONSTEXPR void _assign_move_helper(ring_buffer& o, Tag&& /*t*/) {
+      CONSTEXPR void _transfer_source(ring_buffer& o, Tag&& /*t*/) {
         auto& this_data = _pair._second;
         auto& this_alloc = get_allocator();
         size_type this_size = this_data._size;
@@ -816,7 +851,8 @@ namespace voxory {
 
       // Provides strong or basic exception guarantee depending on element move/copy properties; 
       // helper itself gives basic guarantee.
-      CONSTEXPR void _assign_move(ring_buffer& o) {
+      template<typename Tag>
+      CONSTEXPR void _assign(ring_buffer& o, Tag&& t) {
         size_type this_capacity = _capacity;
         size_type o_capacity = o._capacity;
         size_type this_size = size();
@@ -825,7 +861,7 @@ namespace voxory {
         //strong guarantee
         if (this_size == 0 || o_size == 0) {
           if (o_size != 0) {
-            _cleanup_and_move_source(o);
+            _release_and_transfer(o, t);
           }
           else {
             if (o_capacity != _capacity)
@@ -839,22 +875,22 @@ namespace voxory {
         //strong guarantee
         if (o_capacity > _capacity)
         {
-          _cleanup_and_move_source(o);
+          _release_and_transfer(o, t);
           return;
         }
         //basic guarantee
-        if constexpr (internal::is_nothrow_move_assignable_n_v<allocator_type, pointer>) {
-          _assign_move_helper(o, internal::move_tag{});
+        if constexpr (internal::is_nothrow_move_assignable_n_v<allocator_type, pointer> && std::is_same_v<std::remove_cvref_t<Tag>, internal::move_tag>) {
+          _transfer_source(o, internal::move_tag{});
         }
         else {
           //basic guarantee
           if constexpr (internal::is_nothrow_copy_assignable_n_v<allocator_type, pointer>) {
-            _assign_move_helper(o, internal::copy_tag{});
+            _transfer_source(o, internal::copy_tag{});
           }
           //strong guarantee
           else {
-            //destroy elements in current buffer and uninitialized_move from source with strong guarantee
-            _destroy_and_move_source(o);
+            //destroy elements in current buffer and uninitialized_move/copy from source with strong guarantee
+            _destroy_and_transfer_source(o, t);
             return;
           }
         }
@@ -863,6 +899,15 @@ namespace voxory {
       CONSTEXPR void _allocate_buffer(size_type count) {
         auto& data = _pair._second;
         auto& alloc = get_allocator();
+
+        if (count == 0)
+        {
+          data._first = nullptr;
+          data._last = nullptr;
+          data._size = 0;
+          _capacity = 0;
+          return;
+        }
 
         data._data = alloc.allocate(count);
 
@@ -878,13 +923,14 @@ namespace voxory {
         auto& start = data._data;
         auto& first = data._first;
         auto& last = data._last;
-
-        alloc.deallocate(start, _capacity);
-        start = nullptr;
-        first = nullptr;
-        last = nullptr;
-        data._size = 0;
-        _capacity = 0;
+        if (start != nullptr) {
+          alloc.deallocate(start, _capacity);
+          start = nullptr;
+          first = nullptr;
+          last = nullptr;
+          data._size = 0;
+          _capacity = 0;
+        }
       }
 
       CONSTEXPR void _destroy_range(pointer first, pointer last) noexcept(std::is_nothrow_destructible_v<value_type>) {
@@ -973,7 +1019,7 @@ namespace voxory {
         pointer _data;
         // first constructed element
         pointer _first;
-        // last constructed element
+        // one-past-last constructed element
         pointer _last;
         // size of constructed elements
         size_type _size;
