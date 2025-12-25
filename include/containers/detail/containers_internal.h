@@ -140,7 +140,7 @@ namespace voxory
         ~cleanup_guard() {
           if (obj_)
           {
-            obj_->cleanup();
+            obj_->_cleanup();
           }
         };
         void release() {
@@ -526,6 +526,31 @@ namespace voxory
           return dest;
         }
       }
+      
+      template<typename Alloc,typename... Args>
+      NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer construct_at(typename std::allocator_traits<Alloc>::pointer at, Alloc& alloc, Args&&... args) 
+        noexcept(std::is_nothrow_constructible_v<typename std::allocator_traits<Alloc>::value_type, Args...>) {
+        if constexpr (type_traits::has_construct_v<Alloc, typename std::allocator_traits<Alloc>::pointer, Args... >) {
+          alloc.construct(at, std::forward<Args>(args)...);
+        }
+        else {
+          std::construct_at(at, std::forward<Args>(args)...);
+        }
+        return at + 1;
+      }
+
+      template<typename Alloc>
+      NODISCARD CONSTEXPR typename std::allocator_traits<Alloc>::pointer destroy_at(typename std::allocator_traits<Alloc>::pointer at, Alloc& alloc)
+        noexcept(std::is_nothrow_destructible_v<typename std::allocator_traits<Alloc>::value_type>) {
+        if constexpr (type_traits::has_destroy_v<Alloc, typename std::allocator_traits<Alloc>::pointer>) {
+          alloc.destroy(at);
+        }
+        else {
+          std::destroy_at(at);
+        }
+        return at + 1;
+      }
+      
       template<typename Alloc, typename FwdIt>
       constexpr bool is_nothrow_uninitialized_moveable_v = noexcept(internal::uninitialized_move(
         std::declval<FwdIt>(), std::declval<FwdIt>(),
@@ -555,6 +580,7 @@ namespace voxory
         std::declval<FwdIt>(), std::declval<typename std::allocator_traits<Alloc>::size_type>(),
         std::declval<typename std::allocator_traits<Alloc>::pointer>(), std::declval<Alloc&>()
       ));
+
     }
   }
 }

@@ -7,8 +7,60 @@
 #include <type_traits>
 #include <iomanip>
 
+template<typename T>
+class simple_allocator {
+public:
+  using value_type = T;
+  using pointer = T*;
+
+  // для контейнерів STL
+  using propagate_on_container_move_assignment = std::false_type;
+  using is_always_equal = std::false_type;
+
+  simple_allocator() noexcept = default;
+
+  template<typename U>
+  simple_allocator(const simple_allocator<U>&) noexcept {}
+
+  // allocate/deallocate для демонстрації
+  T* allocate(std::size_t n) {
+    std::cout << "allocate " << n << " elements\n";
+    return static_cast<T*>(::operator new(n * sizeof(T)));
+  }
+
+  void deallocate(T* p, std::size_t n) noexcept {
+    std::cout << "deallocate " << n << " elements\n";
+    ::operator delete(p);
+  }
+
+  // для тесту копій/присвоєння
+  simple_allocator& operator=(const simple_allocator&) noexcept = default;
+
+  // comparison
+  bool operator==(const simple_allocator&) const noexcept { return false; }
+  bool operator!=(const simple_allocator&) const noexcept { return true; }
+};
+#include <containers/impl/heap_array.h>
 NOYX_TEST(shitttt, sadsadad) {
-    voxory::containers::ring_buffer<int, std::allocator<int>> a;
+  class shit {
+  public:
+    shit() : a(0) {};
+    shit(shit&& o) : a(o.a) {};
+    shit(const shit& o) : a(o.a) {};
+    shit& operator=(const shit& o) {
+      if (this == std::addressof(o)) return *this;
+      a = o.a;
+      return *this;
+    }
+    ~shit() = default;
+    int a;
+  };
+  voxory::containers::ring_buffer<shit, simple_allocator<shit>> a(100);
+  voxory::containers::ring_buffer<shit, simple_allocator<shit>> b(100);
+  a = std::move(b);
+  voxory::containers::heap_array<shit, simple_allocator<shit>> ah(100);
+  voxory::containers::heap_array<shit, simple_allocator<shit>> bh(100);
+  ah = std::move(bh);
 }
 
 //

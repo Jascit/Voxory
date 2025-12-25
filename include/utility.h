@@ -22,22 +22,22 @@ namespace utility {
 
   template<typename T1, typename T2, bool = std::is_empty_v<T1> && !std::is_final_v<T1>>
   class compressed_pair final {
-    T1 first_;
+    T1 _first;
 
   public:
-    T2 second_;
+    T2 _second;
     constexpr void swap(compressed_pair<T1, T2, false>& other) noexcept(std::is_nothrow_copy_assignable_v<T1>&& std::is_nothrow_copy_assignable_v<T2>) {
-      T1 temp1_ = std::move(first_);
-      T2 temp2_ = std::move(second_);
-      second_ = std::move(other.second());
-      first_ = std::move(other.first());
-      other.second_ = std::move(temp1_);
-      other.second_ = std::move(temp2_);
+      T1 temp1_ = std::move(_first);
+      T2 temp2_ = std::move(_second);
+      _second = std::move(other.second());
+      _first = std::move(other.first());
+      other._second = std::move(temp1_);
+      other._second = std::move(temp2_);
     }
 
     constexpr void copy(const compressed_pair<T1, T2, false>& other) noexcept(std::is_nothrow_copy_assignable_v<T1>&& std::is_nothrow_copy_assignable_v<T2>) {
-      second_ = other.second();
-      first_ = other.first();
+      _second = other.second();
+      _first = other.first();
     }
 
     compressed_pair() = default;
@@ -47,35 +47,35 @@ namespace utility {
       std::is_nothrow_constructible_v<T1>&&
       std::is_nothrow_constructible_v<T2, Args&&...>
       )
-      : first_(), second_(std::forward<Args>(args)...) {
+      : _first(), _second(std::forward<Args>(args)...) {
     }
 
     template<typename U1, typename... Args>
     constexpr compressed_pair(detail::FirstOneSecondArgs, U1&& f, Args&&... args) noexcept(
       std::is_nothrow_constructible_v<T1, U1&&>&&
       std::is_nothrow_constructible_v<T2, Args&&...>)
-      : first_(std::forward<U1>(f)), second_(std::forward<Args>(args)...) {
+      : _first(std::forward<U1>(f)), _second(std::forward<Args>(args)...) {
     }
 
-    constexpr T1& first() noexcept { return first_; }
-    constexpr const T1& first() const noexcept { return first_; }
+    constexpr T1& first() noexcept { return _first; }
+    constexpr const T1& first() const noexcept { return _first; }
   };
 
   template<typename T1, typename T2>
   class compressed_pair<T1, T2, true> final : private T1 {
   public:
-    T2 second_;
+    T2 _second;
 
     constexpr void swap(compressed_pair<T1, T2>& other) noexcept(
       std::is_nothrow_move_assignable_v<T1>&& std::is_nothrow_move_assignable_v<T2>)
     {
-      T2 tmp2 = std::move(second_);
-      second_ = std::move(other.second_);
-      other.second_ = std::move(tmp2);
+      T2 tmp2 = std::move(_second);
+      _second = std::move(other._second);
+      other._second = std::move(tmp2);
     }
 
     constexpr void copy(const compressed_pair<T1, T2>& other) noexcept(std::is_nothrow_copy_assignable_v<T1>&& std::is_nothrow_copy_assignable_v<T2>) {
-      second_ = other.second();
+      _second = other.second();
     }
 
     compressed_pair() : T1() {}
@@ -86,7 +86,7 @@ namespace utility {
       std::is_nothrow_constructible<T1>,
       std::is_nothrow_constructible<T2, Args&&...>
       >)
-      : T1(), second_(std::forward<Args>(args)...) {
+      : T1(), _second(std::forward<Args>(args)...) {
     }
 
     template<typename U1, typename... Args>
@@ -95,49 +95,11 @@ namespace utility {
       std::is_nothrow_constructible<T1, U1&&>,
       std::is_nothrow_constructible<T2, Args&&...>
       >)
-      : T1(std::forward<U1>(f)), second_(std::forward<Args>(args)...) {
+      : T1(std::forward<U1>(f)), _second(std::forward<Args>(args)...) {
     }
 
     constexpr T1& first() noexcept { return static_cast<T1&>(*this); }
     constexpr const T1& first() const noexcept { return static_cast<T1 const&>(*this); }
-  };
-
-  template<typename Alloc, typename FirstIt, typename SecondIt>
-  _CONSTEXPR20 void destroy_range(Alloc& a, FirstIt first, SecondIt last)
-    noexcept(std::is_nothrow_destructible_v<typename std::iterator_traits<FirstIt>::value_type>)
-  {
-    using traits = std::allocator_traits<Alloc>;
-    using value_type = typename traits::value_type;
-    if constexpr (!std::is_trivially_destructible_v<value_type>) {
-      for (auto it = first; it != last; ++it) {
-        traits::destroy(a, std::addressof(*it));
-      }
-    }
-  }
-  template <class FwdIt, class LastIt>
-  _CONSTEXPR20 void destroy_range(FwdIt start, LastIt last) noexcept(std::is_nothrow_destructible_v<typename std::iterator_traits<FwdIt>::value_type>);
-
-  template<typename T>
-  _CONSTEXPR20 void destroy_in_place(T& o)
-    noexcept(std::is_nothrow_destructible_v<T>)
-  {
-    if constexpr (std::is_array_v<T>) {
-      destroy_range(o, o + std::extent_v<T>);
-    }
-    else {
-      o.~T();
-    }
-  }
-
-  template <class FwdIt, class LastIt>
-  _CONSTEXPR20 void destroy_range(FwdIt start, LastIt last) noexcept(std::is_nothrow_destructible_v<typename std::iterator_traits<FwdIt>::value_type>) {
-    using value_type = typename std::iterator_traits<FwdIt>::value_type;
-    if constexpr (!std::is_trivially_destructible_v<value_type>)
-    {
-      for (; start != last; ++start) {
-        destroy_in_place(*start);
-      }
-    }
   };
 
 

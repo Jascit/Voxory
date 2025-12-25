@@ -20,28 +20,28 @@ namespace voxory {
         using difference_type = std::ptrdiff_t;
         using iterator_category = std::bidirectional_iterator_tag;
 
-        CONSTEXPR ConstListIterator() noexcept : ptr_(nullptr) {}
-        CONSTEXPR explicit ConstListIterator(node_pointer ptr) noexcept : ptr_(ptr) {}
+        CONSTEXPR ConstListIterator() noexcept : _ptr(nullptr) {}
+        CONSTEXPR explicit ConstListIterator(node_pointer ptr) noexcept : _ptr(ptr) {}
 
         CONSTEXPR reference operator*() const noexcept { 
 #ifdef DEBUG_ITERATORS
-          ASSERT_ABORT(ptr_ != nullptr, "");
+          ASSERT_ABORT(_ptr != nullptr, "");
 #endif // DEBUG_ITERATORS
-          return ptr_->data_; 
+          return _ptr->_data; 
         }
         CONSTEXPR const_pointer operator->() const noexcept { 
 #ifdef DEBUG_ITERATORS
-          ASSERT_ABORT(ptr_ != nullptr, ""); 
+          ASSERT_ABORT(_ptr != nullptr, ""); 
 #endif // DEBUG_ITERATORS
 
-          return &ptr_->data_; 
+          return &_ptr->_data; 
         }
 
         CONSTEXPR ConstListIterator& operator++() noexcept {
 #ifdef DEBUG_ITERATORS
-          ASSERT_ABORT(ptr_ != nullptr, "");
+          ASSERT_ABORT(_ptr != nullptr, "");
 #endif // DEBUG_ITERATORS
-          ptr_ = ptr_->next_;
+          _ptr = _ptr->_next;
           return *this;
         }
         CONSTEXPR ConstListIterator operator++(int) noexcept {
@@ -52,9 +52,9 @@ namespace voxory {
 
         CONSTEXPR ConstListIterator& operator--() noexcept {
 #ifdef DEBUG_ITERATORS
-          ASSERT_ABORT(ptr_ != nullptr, "");
+          ASSERT_ABORT(_ptr != nullptr, "");
 #endif // DEBUG_ITERATORS
-          ptr_ = ptr_->last_;
+          _ptr = _ptr->_last;
           return *this;
         }
         CONSTEXPR ConstListIterator operator--(int) noexcept {
@@ -67,17 +67,17 @@ namespace voxory {
           if (off >= 0) {
             while (off--) {
 #ifdef DEBUG_ITERATORS
-              ASSERT_ABORT(ptr_ != nullptr, "");
+              ASSERT_ABORT(_ptr != nullptr, "");
 #endif // DEBUG_ITERATORS
-              ptr_ = ptr_->next_;
+              _ptr = _ptr->_next;
             }
           }
           else {
             while (off++) {
 #ifdef DEBUG_ITERATORS
-              ASSERT_ABORT(ptr_ != nullptr, "");
+              ASSERT_ABORT(_ptr != nullptr, "");
 #endif // DEBUG_ITERATORS
-              ptr_ = ptr_->last_;
+              _ptr = _ptr->_last;
             }
           }
           return *this;
@@ -93,17 +93,17 @@ namespace voxory {
           ConstListIterator tmp = *this; tmp -= off; return tmp;
         }
 
-        CONSTEXPR bool operator==(const ConstListIterator& other) const noexcept { return ptr_ == other.ptr_; }
-        CONSTEXPR bool operator!=(const ConstListIterator& other) const noexcept { return ptr_ != other.ptr_; }
+        CONSTEXPR bool operator==(const ConstListIterator& other) const noexcept { return _ptr == other._ptr; }
+        CONSTEXPR bool operator!=(const ConstListIterator& other) const noexcept { return _ptr != other._ptr; }
 
         CONSTEXPR reference operator[](difference_type off) const noexcept {
-          node_pointer tmp = ptr_;
+          node_pointer tmp = _ptr;
           if (off >= 0) {
             while (off--) { 
 #ifdef DEBUG_ITERATORS
               ASSERT_ABORT(tmp != nullptr, ""); 
 #endif // DEBUG_ITERATORS
-              tmp = tmp->next_; 
+              tmp = tmp->_next; 
             }
           }
           else {
@@ -111,17 +111,17 @@ namespace voxory {
 #ifdef DEBUG_ITERATORS
               ASSERT_ABORT(tmp != nullptr, ""); 
 #endif // DEBUG_ITERATORS
-              tmp = tmp->last_; 
+              tmp = tmp->_last; 
             }
           }
-          return tmp->data_;
+          return tmp->_data;
         }
 
         CONSTEXPR const node_pointer unwrap() const {
-          return ptr_;
+          return _ptr;
         }
       protected:
-        node_pointer ptr_;
+        node_pointer _ptr;
       };
 
       // ListIterator (mutable)
@@ -144,7 +144,7 @@ namespace voxory {
           return const_cast<reference>(base_type::operator*());
         }
         CONSTEXPR pointer operator->() const noexcept {
-          return &this->ptr_->data_;
+          return &this->_ptr->_data;
         }
 
         CONSTEXPR ListIterator& operator++() noexcept { base_type::operator++(); return *this; }
@@ -171,14 +171,14 @@ namespace voxory {
       template<typename T>
       struct default_node {
         using value_type = T;
-        default_node() : data_(nullptr), next_(nullptr), last_(nullptr) {}
+        default_node() : _data(nullptr), _next(nullptr), _last(nullptr) {}
         default_node(value_type data, default_node* next = nullptr, default_node* last = nullptr)
-          : data_(data), next_(next), last_(last) {
+          : _data(data), _next(next), _last(last) {
         }
         ~default_node() = default;
-        value_type data_;
-        default_node* next_;
-        default_node* last_;
+        value_type _data;
+        default_node* _next;
+        default_node* _last;
       };
     }
 
@@ -199,21 +199,21 @@ namespace voxory {
       using const_iterator = detail::ConstListIterator<list>;
       using size_type = std::size_t;
 
-      list(allocator_type alloc = allocator_type()) noexcept(std::is_nothrow_default_constructible_v<allocator_type>) : pair_(FirstOneSecondArgs{}, alloc), size_(0) {};
+      list(allocator_type alloc = allocator_type()) noexcept(std::is_nothrow_default_constructible_v<allocator_type>) : _pair(FirstOneSecondArgs{}, alloc), _size(0) {};
 
       explicit list(size_t n, allocator_type alloc = allocator_type())
-        : pair_(FirstOneSecondArgs{}, alloc, std::pair<pointer, pointer>{nullptr, nullptr}), size_(0)
+        : _pair(FirstOneSecondArgs{}, alloc, std::pair<pointer, pointer>{nullptr, nullptr}), _size(0)
       {
         for (size_t i = 0; i < n; ++i) emplace_back(nullptr);
       }
 
-      list(const list& o) : pair_(FirstOneSecondArgs{}, allocator_traits::select_on_container_copy_construction(o.pair_.first())), size_(o.size_) {
+      list(const list& o) : _pair(FirstOneSecondArgs{}, allocator_traits::select_on_container_copy_construction(o._pair.first())), _size(o._size) {
         for (auto& e : o) {
           emplace_back(e);
         }
       }
 
-      list(list&& o) : pair_(FirstOneSecondArgs{}, std::move(o.pair_.first())), size_(o.size_) {
+      list(list&& o) : _pair(FirstOneSecondArgs{}, std::move(o._pair.first())), _size(o._size) {
         for (auto& e : o) {
           emplace_back(std::move(e));
         }
@@ -228,8 +228,8 @@ namespace voxory {
         auto& al = get_allocator();
         auto& o_al = o.get_allocator();
 
-        auto& data = pair_.second_;
-        auto& o_data = o.pair_.second_;
+        auto& data = _pair._second;
+        auto& o_data = o._pair._second;
 
         if constexpr (allocator_traits::propagate_on_container_copy_assignment::value) {
           //change allocator, allocate with copy ctor from new one
@@ -277,15 +277,15 @@ namespace voxory {
 
 
       NODISCARD CONSTEXPR iterator begin() noexcept {
-        return iterator(pair_.second_.first);
+        return iterator(_pair._second.first);
       };
 
       NODISCARD CONSTEXPR const_iterator begin() const noexcept {
-        return const_iterator(pair_.second_.first);
+        return const_iterator(_pair._second.first);
       };
 
       NODISCARD CONSTEXPR const_iterator cbegin() const noexcept {
-        return const_iterator(pair_.second_.first);
+        return const_iterator(_pair._second.first);
       };
 
       NODISCARD CONSTEXPR iterator end() noexcept {
@@ -301,10 +301,10 @@ namespace voxory {
       };
 
 
-      CONSTEXPR bool empty() const noexcept { return size_ == 0; }
-      size_type size() const noexcept { return size_; }
+      CONSTEXPR bool empty() const noexcept { return _size == 0; }
+      size_type size() const noexcept { return _size; }
 
-      // push_back (встановлюємо last_ і next_)
+      // push_back (встановлюємо _last і _next)
       CONSTEXPR node_type* push_back(const value_type& val) {
         return emplace_back(val);
       }
@@ -314,64 +314,64 @@ namespace voxory {
       }
 
       CONSTEXPR void pop_back() {
-        if (!pair_.second_.first) return;
-        if (pair_.second_.first == pair_.second_.second) {
-          _destroy_node(pair_.second_.first);
-          pair_.second_.first = pair_.second_.second = nullptr;
-          size_ = 0;
+        if (!_pair._second.first) return;
+        if (_pair._second.first == _pair._second.second) {
+          _destroy_node(_pair._second.first);
+          _pair._second.first = _pair._second.second = nullptr;
+          _size = 0;
           return;
         }
-        pointer tail = pair_.second_.second;
-        pointer prev = tail->last_;
+        pointer tail = _pair._second.second;
+        pointer prev = tail->_last;
         _destroy_node(tail);
-        prev->next_ = nullptr;
-        pair_.second_.second = prev;
-        --size_;
+        prev->_next = nullptr;
+        _pair._second.second = prev;
+        --_size;
       }
 
       CONSTEXPR void pop_at(pointer loc) {
         if (!loc) return;
 
-        if (loc->last_) loc->last_->next_ = loc->next_;
+        if (loc->_last) loc->_last->_next = loc->_next;
         else {
-          pair_.second_.first = loc->next_;
-          if (loc->next_) {
-            loc->next_->last_ = nullptr;
+          _pair._second.first = loc->_next;
+          if (loc->_next) {
+            loc->_next->_last = nullptr;
           }
         }
 
-        if (loc->next_) loc->next_->last_ = loc->last_;
+        if (loc->_next) loc->_next->_last = loc->_last;
         else {
-          pair_.second_.second = loc->last_;
-          if (loc->last_) {
-            loc->last_->next_ = nullptr;
+          _pair._second.second = loc->_last;
+          if (loc->_last) {
+            loc->_last->_next = nullptr;
           }
         }
 
         _destroy_node(loc);
-        --size_;
+        --_size;
       }
 
       CONSTEXPR void clear() noexcept {
-        node_type* cur = pair_.second_.first;
+        node_type* cur = _pair._second.first;
         while (cur) {
-          node_type* next = cur->next_;
+          node_type* next = cur->_next;
           _destroy_node(cur);
           cur = next;
         }
-        pair_.second_.first = pair_.second_.second = nullptr;
-        size_ = 0;
+        _pair._second.first = _pair._second.second = nullptr;
+        _size = 0;
       }
 
       CONSTEXPR node_type* data() {
-        return pair_.second_.first;
+        return _pair._second.first;
       }
 
       CONSTEXPR const allocator_type& get_allocator() const {
-        return pair_.first();
+        return _pair.first();
       }
       CONSTEXPR allocator_type& get_allocator() {
-        return pair_.first();
+        return _pair.first();
       }
 
       CONSTEXPR void _destroy_node(node_type* p) noexcept {
@@ -382,39 +382,39 @@ namespace voxory {
           }
           else
           {
-            pair_.first().destroy(p);
+            _pair.first().destroy(p);
           }
         }
-        pair_.first().deallocate(p, 1);
+        _pair.first().deallocate(p, 1);
       }
     private:
       inline list& steal_no_cleanup(list& o) noexcept {
-        pair_.second_.first = std::exchange(o.pair_.second_.first, nullptr);
-        pair_.second_.second = std::exchange(o.pair_.second_.second, nullptr);
-        size_ = std::exchange(o.size_, 0);
+        _pair._second.first = std::exchange(o._pair._second.first, nullptr);
+        _pair._second.second = std::exchange(o._pair._second.second, nullptr);
+        _size = std::exchange(o._size, 0);
         return *this;
       }
 
       template<typename U>
       CONSTEXPR node_type* emplace_back(U&& val) {
-        pointer p = pair_.first().allocate(1);
-        // placement new з повною ініціалізацією last_:
-        new (p) node_type(std::forward<U>(val), nullptr, pair_.second_.second);
-        if (!pair_.second_.first) {
-          pair_.second_.first = pair_.second_.second = p;
+        pointer p = _pair.first().allocate(1);
+        // placement new з повною ініціалізацією _last:
+        new (p) node_type(std::forward<U>(val), nullptr, _pair._second.second);
+        if (!_pair._second.first) {
+          _pair._second.first = _pair._second.second = p;
         }
         else {
-          pair_.second_.second->next_ = p;
-          p->last_ = pair_.second_.second;
-          pair_.second_.second = p;
+          _pair._second.second->_next = p;
+          p->_last = _pair._second.second;
+          _pair._second.second = p;
         }
-        ++size_;
+        ++_size;
         return p;
       }
 
       void assign_move(list&& o) {
-        size_t my_sz = size_;
-        size_t other_sz = o.size_;
+        size_t my_sz = _size;
+        size_t other_sz = o._size;
         size_t common = (std::min)(my_sz, other_sz);
 
         auto it = begin();
@@ -436,13 +436,13 @@ namespace voxory {
             _destroy_node(erase_it.unwrap());
             erase_it = next;
           }
-          size_ = other_sz;
+          _size = other_sz;
         }
       }
 
       void assign_copy(const list& o) {
-        size_t my_sz = size_;
-        size_t other_sz = o.size_;
+        size_t my_sz = _size;
+        size_t other_sz = o._size;
         size_t common = (std::min)(my_sz, other_sz);
 
         auto it = begin();
@@ -464,13 +464,13 @@ namespace voxory {
             _destroy_node(erase_it.unwrap());
             erase_it = next;
           }
-          size_ = other_sz;
+          _size = other_sz;
         }
       }
 
     private:
-      utility::compressed_pair<allocator_type, std::pair<pointer, pointer>> pair_;
-      size_t size_;
+      utility::compressed_pair<allocator_type, std::pair<pointer, pointer>> _pair;
+      size_t _size;
     };
   }
 }

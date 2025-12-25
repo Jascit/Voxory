@@ -25,16 +25,16 @@ namespace voxory {
         using iterator_category = std::random_access_iterator_tag;
 
         // ctors
-        CONSTEXPR ConstStaticArrayIterator() noexcept : ptr_(nullptr) {}
-        CONSTEXPR explicit ConstStaticArrayIterator(pointer p) noexcept : ptr_(p) {}
+        CONSTEXPR ConstStaticArrayIterator() noexcept : _ptr(nullptr) {}
+        CONSTEXPR explicit ConstStaticArrayIterator(pointer p) noexcept : _ptr(p) {}
 
         // dereference
-        NODISCARD CONSTEXPR reference operator*() const noexcept { return *ptr_; }
-        NODISCARD CONSTEXPR const_pointer operator->() const noexcept { return ptr_; }
+        NODISCARD CONSTEXPR reference operator*() const noexcept { return *_ptr; }
+        NODISCARD CONSTEXPR const_pointer operator->() const noexcept { return _ptr; }
 
         // prefix / postfix ++
         CONSTEXPR ConstStaticArrayIterator& operator++() noexcept {
-          ++ptr_;
+          ++_ptr;
           return *this;
         }
         CONSTEXPR ConstStaticArrayIterator operator++(int) noexcept {
@@ -45,7 +45,7 @@ namespace voxory {
 
         // prefix / postfix --
         CONSTEXPR ConstStaticArrayIterator& operator--() noexcept {
-          --ptr_;
+          --_ptr;
           return *this;
         }
         CONSTEXPR ConstStaticArrayIterator operator--(int) noexcept {
@@ -56,7 +56,7 @@ namespace voxory {
 
         // random-access arithmetic
         CONSTEXPR ConstStaticArrayIterator& operator+=(difference_type off) noexcept {
-          ptr_ += off;
+          _ptr += off;
           return *this;
         }
         NODISCARD CONSTEXPR ConstStaticArrayIterator operator+(difference_type off) const noexcept {
@@ -66,7 +66,7 @@ namespace voxory {
         }
 
         CONSTEXPR ConstStaticArrayIterator& operator-=(difference_type off) noexcept {
-          ptr_ -= off;
+          _ptr -= off;
           return *this;
         }
         NODISCARD CONSTEXPR ConstStaticArrayIterator operator-(difference_type off) const noexcept {
@@ -77,24 +77,24 @@ namespace voxory {
 
         // difference between iterators
         CONSTEXPR difference_type operator-(const ConstStaticArrayIterator& other) const noexcept {
-          return static_cast<difference_type>(ptr_ - other.ptr_);
+          return static_cast<difference_type>(_ptr - other._ptr);
         }
 
         // comparisons
-        CONSTEXPR bool operator==(const ConstStaticArrayIterator& other) const noexcept { return ptr_ == other.ptr_; }
-        CONSTEXPR bool operator!=(const ConstStaticArrayIterator& other) const noexcept { return ptr_ != other.ptr_; }
-        CONSTEXPR bool operator<(const ConstStaticArrayIterator& other) const noexcept { return ptr_ < other.ptr_; }
-        CONSTEXPR bool operator>(const ConstStaticArrayIterator& other) const noexcept { return ptr_ > other.ptr_; }
-        CONSTEXPR bool operator<=(const ConstStaticArrayIterator& other) const noexcept { return ptr_ <= other.ptr_; }
-        CONSTEXPR bool operator>=(const ConstStaticArrayIterator& other) const noexcept { return ptr_ >= other.ptr_; }
+        CONSTEXPR bool operator==(const ConstStaticArrayIterator& other) const noexcept { return _ptr == other._ptr; }
+        CONSTEXPR bool operator!=(const ConstStaticArrayIterator& other) const noexcept { return _ptr != other._ptr; }
+        CONSTEXPR bool operator<(const ConstStaticArrayIterator& other) const noexcept { return _ptr < other._ptr; }
+        CONSTEXPR bool operator>(const ConstStaticArrayIterator& other) const noexcept { return _ptr > other._ptr; }
+        CONSTEXPR bool operator<=(const ConstStaticArrayIterator& other) const noexcept { return _ptr <= other._ptr; }
+        CONSTEXPR bool operator>=(const ConstStaticArrayIterator& other) const noexcept { return _ptr >= other._ptr; }
 
         // random-access indexing
         NODISCARD CONSTEXPR reference operator[](difference_type off) const noexcept {
-          return *(ptr_ + off);
+          return *(_ptr + off);
         }
 
       protected:
-        pointer ptr_;
+        pointer _ptr;
       };
 
 
@@ -118,7 +118,7 @@ namespace voxory {
           return const_cast<reference>(base_type::operator*());
         }
         NODISCARD CONSTEXPR pointer operator->() const noexcept {
-          return this->ptr_;
+          return this->_ptr;
         }
 
         // reuse base implementations for ++/-- and arithmetic via using / delegation
@@ -222,123 +222,123 @@ namespace voxory {
       using const_reference = const reference;
       using trivial_traits = type_traits::trivial_traits<value_type>;
 
-      static constexpr size_type capacity_ = N;
+      static constexpr size_type _capacity = N;
       using array_type = std::conditional_t<N == 0, internal::empty_data, unsigned char[N * sizeof(value_type)]>;
       using iterator = detail::StaticArrayIterator<detail::static_array_traits<value_type>>;
       using const_iterator = detail::ConstStaticArrayIterator<detail::static_array_traits<value_type>>;
 
       ~static_array() {
-        cleanup();
+        _cleanup();
       };
 
       static_array() noexcept(std::is_nothrow_default_constructible_v<value_type>) {
-        construct_range(N);
+        _construct_range(N);
       };
 
-      static_array(const detail::static_array_base<value_type>& o) noexcept(noexcept(construct_range(std::declval<size_type>(), std::declval<pointer>(), std::declval<pointer>()))) {
-        construct_range(o.capacity(), o.data(), o.data() + o.capacity());
+      static_array(const detail::static_array_base<value_type>& o) noexcept(noexcept(_construct_range(std::declval<size_type>(), std::declval<pointer>(), std::declval<pointer>()))) {
+        _construct_range(o.capacity(), o.data(), o.data() + o.capacity());
       };
 
       static_array(detail::static_array_base<value_type>&& o) noexcept(std::is_nothrow_move_constructible_v<value_type>&& std::is_nothrow_default_constructible_v<value_type>) {
-        auto& first_ref = pair_.first;
-        auto& last_ref = pair_.second;
-        first_ref = std::launder(reinterpret_cast<pointer>(&data_));
-        size_type n = std::min(capacity_, o.capacity());
+        auto& first_ref = _pair.first;
+        auto& last_ref = _pair.second;
+        first_ref = std::launder(reinterpret_cast<pointer>(&_data));
+        size_type n = std::min(_capacity, o.capacity());
         last_ref = std::uninitialized_move(o.data(), o.data() + n, data());
-        if (n < capacity_)
-          last_ref = std::uninitialized_default_construct_n(first_ref + n, capacity_ - n);
+        if (n < _capacity)
+          last_ref = std::uninitialized_default_construct_n(first_ref + n, _capacity - n);
       };
 
       NODISCARD CONSTEXPR iterator begin() noexcept {
-        return iterator(pair_.first);
+        return iterator(_pair.first);
       };
 
       NODISCARD CONSTEXPR const_iterator begin() const noexcept {
-        return const_iterator(pair_.first);
+        return const_iterator(_pair.first);
       };
 
       NODISCARD CONSTEXPR iterator end() noexcept {
-        return iterator(pair_.first + capacity_);
+        return iterator(_pair.first + _capacity);
       };
 
       NODISCARD CONSTEXPR const_iterator end() const noexcept {
-        return const_iterator(pair_.first + capacity_);
+        return const_iterator(_pair.first + _capacity);
       };
 
       NODISCARD CONSTEXPR const_iterator cend() const noexcept {
-        return const_iterator(pair_.first + capacity_);
+        return const_iterator(_pair.first + _capacity);
       };
 
       NODISCARD CONSTEXPR const_iterator cbegin() const noexcept {
-        return const_iterator(pair_.first);
+        return const_iterator(_pair.first);
       };
 
       CONSTEXPR static_array& operator=(const detail::static_array_base<value_type>& o) {
         if (this == &o) return *this;
-        if (o.capacity() > capacity_) {
-          pair_.second = copy_assign(o.data(), o.data() + capacity_, pair_.first);
+        if (o.capacity() > _capacity) {
+          _pair.second = _copy_assign(o.data(), o.data() + _capacity, _pair.first);
         }
         else {
-          pointer new_last = copy_assign(o.data(), o.data() + capacity_, pair_.first);
-          destroy_range(new_last, pair_.second);
-          pair_.second = new_last;
-          pair_.second = std::uninitialized_default_construct_n(pair_.second, capacity_ - (pair_.second - pair_.first));
+          pointer new_last = _copy_assign(o.data(), o.data() + _capacity, _pair.first);
+          _destroy_range(new_last, _pair.second);
+          _pair.second = new_last;
+          _pair.second = std::uninitialized_default_construct_n(_pair.second, _capacity - (_pair.second - _pair.first));
         }
         return *this;
       };
 
       CONSTEXPR static_array& operator=(detail::static_array_base<value_type>&& o) {
         if (this == &o) return *this;
-        if (o.capacity() > capacity_) {
-          pair_.second = move_assign(o.data(), o.data() + capacity_, pair_.first);
+        if (o.capacity() > _capacity) {
+          _pair.second = _move_assign(o.data(), o.data() + _capacity, _pair.first);
         }
         else {
-          pointer new_last = move_assign(o.data(), o.data() + capacity_, pair_.first);
-          destroy_range(new_last, pair_.second);
-          pair_.second = new_last;
-          pair_.second = std::uninitialized_default_construct_n(pair_.second, capacity_ - (pair_.second - pair_.first));
+          pointer new_last = _move_assign(o.data(), o.data() + _capacity, _pair.first);
+          _destroy_range(new_last, _pair.second);
+          _pair.second = new_last;
+          _pair.second = std::uninitialized_default_construct_n(_pair.second, _capacity - (_pair.second - _pair.first));
         }
         return *this;
       };
 
       NODISCARD CONSTEXPR reference operator[](size_type idx) noexcept {
 #ifdef DEBUG
-        ASSERT_ABORT(idx < capacity_, "static_array: out of range");
+        ASSERT_ABORT(idx < _capacity, "static_array: out of range");
 #endif // DEBUG_ITERATORS
         return data()[idx];
       };
 
       NODISCARD CONSTEXPR const_reference operator[](size_type idx) const noexcept {
 #ifdef DEBUG
-        ASSERT_ABORT(idx >= capacity_, "static_array: out of range");
+        ASSERT_ABORT(idx >= _capacity, "static_array: out of range");
 #endif // DEBUG_ITERATORS
         return data()[idx];
       };
 
       NODISCARD CONSTEXPR size_type capacity() const noexcept override {
-        return capacity_;
+        return _capacity;
       };
 
       NODISCARD CONSTEXPR pointer data() const noexcept override {
-        return pair_.first;
+        return _pair.first;
       };
 
     private:
       template<typename... Args>
-      CONSTEXPR void construct_range(size_t count, Args&&... args) noexcept(detail::IsNoexceptConstructibleRange_v<pointer, Args...>) {
+      CONSTEXPR void _construct_range(size_t count, Args&&... args) noexcept(detail::IsNoexceptConstructibleRange_v<pointer, Args...>) {
         // Args:
         //  - 0 args: default-construct first `count` elements
         //  - 1 arg: fill first `count` elements with value
         //  - 2 args: copy from [src_begin, src_end) into first `count` elements
 
-        auto& first_ref = pair_.first;
-        auto& last_ref = pair_.second;
+        auto& first_ref = _pair.first;
+        auto& last_ref = _pair.second;
 
         // pointer to storage start
-        pointer first = std::launder(reinterpret_cast<pointer>(&data_));
+        pointer first = std::launder(reinterpret_cast<pointer>(&_data));
         first_ref = first;
 
-        const size_type cap = capacity_;
+        const size_type cap = _capacity;
         const size_type n = std::min(count, cap);
 
         if constexpr (sizeof...(Args) == 0) {
@@ -358,7 +358,7 @@ namespace voxory {
           }
         }
       }
-      CONSTEXPR pointer move_assign(pointer first, pointer last, pointer dest) noexcept(std::is_nothrow_move_assignable_v<value_type>) {
+      CONSTEXPR pointer _move_assign(pointer first, pointer last, pointer dest) noexcept(std::is_nothrow_move_assignable_v<value_type>) {
         if (type_traits::use_memmove_copy_construct_v<pointer>)
         {
           std::size_t count = static_cast<std::size_t>(last - first);
@@ -377,7 +377,7 @@ namespace voxory {
         }
       }
 
-      CONSTEXPR pointer copy_assign(pointer first, pointer last, pointer dest) noexcept(std::is_nothrow_move_assignable_v<value_type>) {
+      CONSTEXPR pointer _copy_assign(pointer first, pointer last, pointer dest) noexcept(std::is_nothrow_copy_assignable_v<value_type>) {
         if (type_traits::use_memmove_copy_construct_v<pointer>)
         {
           std::size_t count = static_cast<std::size_t>(last - first);
@@ -395,22 +395,22 @@ namespace voxory {
           return dest;
         }
       }
-      CONSTEXPR void destroy_range(pointer first, pointer end) noexcept(trivial_traits::is_trivially_destructible::value || std::is_nothrow_destructible_v<value_type>) {
+      CONSTEXPR void _destroy_range(pointer first, pointer end) noexcept(trivial_traits::is_trivially_destructible::value || std::is_nothrow_destructible_v<value_type>) {
         if constexpr (!trivial_traits::is_trivially_destructible::value)
         {
           std::destroy_n(first, static_cast<size_t>(end - first));
         }
       };
 
-      CONSTEXPR void cleanup() noexcept(noexcept(destroy_range(std::declval<pointer>(), std::declval<pointer>()))) {
-        auto& first = pair_.first;
-        auto& last = pair_.second;
-        destroy_range(first, last);
+      CONSTEXPR void _cleanup() noexcept(noexcept(_destroy_range(std::declval<pointer>(), std::declval<pointer>()))) {
+        auto& first = _pair.first;
+        auto& last = _pair.second;
+        _destroy_range(first, last);
         last = first;
       }
     private:
-      alignas(value_type) array_type data_;
-      std::pair<pointer, pointer> pair_;
+      alignas(value_type) array_type _data;
+      std::pair<pointer, pointer> _pair;
     };
   }
 }

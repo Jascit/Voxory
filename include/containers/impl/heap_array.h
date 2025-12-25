@@ -40,21 +40,21 @@ namespace voxory {
         using difference_type = std::ptrdiff_t;
         using iterator_category = std::random_access_iterator_tag;
 #ifdef DEBUG_ITERATORS
-        CONSTEXPR ConstHeapArrayIterator(const container_base* container) noexcept : iterator_base(container), ptr_(nullptr) {}
-        CONSTEXPR explicit ConstHeapArrayIterator(const container_base* container, pointer p) noexcept : iterator_base(container), ptr_(p) {}
+        CONSTEXPR ConstHeapArrayIterator(const container_base* container) noexcept : iterator_base(container), _ptr(nullptr) {}
+        CONSTEXPR explicit ConstHeapArrayIterator(const container_base* container, pointer p) noexcept : iterator_base(container), _ptr(p) {}
         ~ConstHeapArrayIterator() {
-          release();
+          _release();
         }
 #else
-        CONSTEXPR ConstHeapArrayIterator() noexcept : ptr_(nullptr) {}
-        CONSTEXPR explicit ConstHeapArrayIterator(pointer p) noexcept : ptr_(p) {}
+        CONSTEXPR ConstHeapArrayIterator() noexcept : _ptr(nullptr) {}
+        CONSTEXPR explicit ConstHeapArrayIterator(pointer p) noexcept : _ptr(p) {}
 #endif // DEBUG_ITERATORS
 
-        NODISCARD CONSTEXPR reference operator*() const noexcept { return *ptr_; }
-        NODISCARD CONSTEXPR pointer operator->() const noexcept { return ptr_; }
+        NODISCARD CONSTEXPR reference operator*() const noexcept { return *_ptr; }
+        NODISCARD CONSTEXPR pointer operator->() const noexcept { return _ptr; }
 
         CONSTEXPR ConstHeapArrayIterator& operator++() noexcept {
-          ++ptr_;
+          ++_ptr;
           return *this;
         }
         CONSTEXPR ConstHeapArrayIterator operator++(int) noexcept {
@@ -64,7 +64,7 @@ namespace voxory {
         }
 
         CONSTEXPR ConstHeapArrayIterator& operator--() noexcept {
-          --ptr_;
+          --_ptr;
           return *this;
         }
         CONSTEXPR ConstHeapArrayIterator operator--(int) noexcept {
@@ -74,7 +74,7 @@ namespace voxory {
         }
 
         CONSTEXPR ConstHeapArrayIterator& operator+=(difference_type off) noexcept {
-          ptr_ += off;
+          _ptr += off;
           return *this;
         }
         NODISCARD CONSTEXPR ConstHeapArrayIterator operator+(difference_type off) const noexcept {
@@ -84,7 +84,7 @@ namespace voxory {
         }
 
         CONSTEXPR ConstHeapArrayIterator& operator-=(difference_type off) noexcept {
-          ptr_ -= off;
+          _ptr -= off;
           return *this;
         }
         NODISCARD CONSTEXPR ConstHeapArrayIterator operator-(difference_type off) const noexcept {
@@ -94,21 +94,21 @@ namespace voxory {
         }
 
         CONSTEXPR difference_type operator-(const ConstHeapArrayIterator& other) const noexcept {
-          return static_cast<difference_type>(ptr_ - other.ptr_);
+          return static_cast<difference_type>(_ptr - other._ptr);
         }
 
-        CONSTEXPR bool operator==(const ConstHeapArrayIterator& other) const noexcept { return ptr_ == other.ptr_; }
-        CONSTEXPR bool operator!=(const ConstHeapArrayIterator& other) const noexcept { return ptr_ != other.ptr_; }
-        CONSTEXPR bool operator<(const ConstHeapArrayIterator& other) const noexcept { return ptr_ < other.ptr_; }
-        CONSTEXPR bool operator>(const ConstHeapArrayIterator& other) const noexcept { return ptr_ > other.ptr_; }
-        CONSTEXPR bool operator<=(const ConstHeapArrayIterator& other) const noexcept { return ptr_ <= other.ptr_; }
-        CONSTEXPR bool operator>=(const ConstHeapArrayIterator& other) const noexcept { return ptr_ >= other.ptr_; }
+        CONSTEXPR bool operator==(const ConstHeapArrayIterator& other) const noexcept { return _ptr == other._ptr; }
+        CONSTEXPR bool operator!=(const ConstHeapArrayIterator& other) const noexcept { return _ptr != other._ptr; }
+        CONSTEXPR bool operator<(const ConstHeapArrayIterator& other) const noexcept { return _ptr < other._ptr; }
+        CONSTEXPR bool operator>(const ConstHeapArrayIterator& other) const noexcept { return _ptr > other._ptr; }
+        CONSTEXPR bool operator<=(const ConstHeapArrayIterator& other) const noexcept { return _ptr <= other._ptr; }
+        CONSTEXPR bool operator>=(const ConstHeapArrayIterator& other) const noexcept { return _ptr >= other._ptr; }
 
         NODISCARD CONSTEXPR reference operator[](difference_type off) const noexcept {
-          return *(ptr_ + off);
+          return *(_ptr + off);
         }
 
-        pointer ptr_;
+        pointer _ptr;
       };
 
       template<typename Traits>
@@ -134,7 +134,7 @@ namespace voxory {
           return const_cast<reference>(base_type::operator*());
         }
         NODISCARD CONSTEXPR pointer operator->() const noexcept {
-          return const_cast<pointer>(this->ptr_);
+          return const_cast<pointer>(this->_ptr);
         }
 
         CONSTEXPR HeapArrayIterator& operator++() noexcept {
@@ -216,39 +216,39 @@ namespace voxory {
       static_assert(std::is_same_v<value_type, typename allocator_traits::value_type>, "value_type must match allocator_traits::value_type");
       static_assert(std::is_object_v<value_type>, "value_type must be an object type");
 
-      heap_array(const allocator_type& alloc = allocator_type()) : pair_(FirstOneSecondArgs{}, alloc), capacity_(0) {}
+      heap_array(const allocator_type& alloc = allocator_type()) : _pair(FirstOneSecondArgs{}, alloc), _capacity(0) {}
 
       heap_array(size_t count, const value_type& val, const allocator_type& alloc = allocator_type())
-        noexcept(noexcept(construct_range(std::declval<size_t>(), std::declval<value_type&&>())))
-        : pair_(FirstOneSecondArgs{}, alloc), capacity_(count) {
-        construct_range(count, val);
+        noexcept(noexcept(_construct_range(std::declval<size_t>(), std::declval<value_type&&>())))
+        : _pair(FirstOneSecondArgs{}, alloc), _capacity(count) {
+        _construct_range(count, val);
       };
 
       heap_array(size_t count, const allocator_type& alloc = allocator_type())
-        noexcept(noexcept(construct_range(std::declval<size_t>(), std::declval<value_type&&>())))
-        : pair_(FirstOneSecondArgs{}, alloc), capacity_(count)
+        noexcept(noexcept(_construct_range(std::declval<size_t>(), std::declval<value_type&&>())))
+        : _pair(FirstOneSecondArgs{}, alloc), _capacity(count)
       {
-        construct_range(count);
+        _construct_range(count);
       };
 
       heap_array(const heap_array& o) noexcept(std::is_nothrow_constructible_v<allocator_type, decltype(std::allocator_traits<allocator_type>::select_on_container_copy_construction(std::declval<allocator_type&>()))>) :
-        pair_(FirstOneSecondArgs{}, allocator_traits::select_on_container_copy_construction(o.pair_.first())), capacity_(o.capacity_) {
-        construct_range(o.capacity_, o.pair_.second_.first_, o.pair_.second_.last_);
+        _pair(FirstOneSecondArgs{}, allocator_traits::select_on_container_copy_construction(o._pair.first())), _capacity(o._capacity) {
+        _construct_range(o._capacity, o._pair._second._first, o._pair._second._last);
       };
 
-      heap_array(heap_array&& o) noexcept(std::is_nothrow_move_constructible_v<allocator_type>) : pair_(FirstOneSecondArgs{}, std::move(o.pair_.first()), std::move(o.pair_.second_)), capacity_(o.capacity_) {
-        o.capacity_ = 0;
+      heap_array(heap_array&& o) noexcept(std::is_nothrow_move_constructible_v<allocator_type>) : _pair(FirstOneSecondArgs{}, std::move(o._pair.first()), std::move(o._pair._second)), _capacity(o._capacity) {
+        o._capacity = 0;
       };
 
       ~heap_array() {
-        cleanup();
+        _cleanup();
       }
 
       heap_array& operator=(heap_array&& o)
         noexcept(
           allocator_traits::propagate_on_container_move_assignment::value
           ? noexcept(get_allocator() = std::move(o.get_allocator()))
-          : noexcept(assign(std::declval<heap_array&>(), internal::move_tag{}))
+          : noexcept(_assign(std::declval<heap_array&>(), internal::move_tag{}))
           )
       {
         if (this == &o) return *this;
@@ -256,26 +256,26 @@ namespace voxory {
         auto& o_al = o.get_allocator();
 
         if constexpr (allocator_traits::propagate_on_container_move_assignment::value) {
-          cleanup();
+          _cleanup();
           al = std::move(o_al);
-          return steal_no_cleanup(o);
+          return _steal_no_cleanup(o);
         }
         else {
           if constexpr (allocator_traits::is_always_equal::value)
           {
-            cleanup();
-            return steal_no_cleanup(o);
+            _cleanup();
+            return _steal_no_cleanup(o);
           }
           else {
             if (al == o_al)
             {
-              cleanup();
-              return steal_no_cleanup(o);
+              _cleanup();
+              return _steal_no_cleanup(o);
             }
             else
             {
-              assign(o, internal::move_tag{});
-              o.cleanup();
+              _assign(o, internal::move_tag{});
+              o._cleanup();
               return *this;
             }
           }
@@ -291,12 +291,12 @@ namespace voxory {
         if constexpr (allocator_traits::propagate_on_container_copy_assignment::value) {
           //change allocator, allocate with copy ctor from new one
           if (al != o_al) {
-            cleanup();
+            _cleanup();
             al = o_al;
           }
         }
 
-        assign(o, internal::copy_tag{});
+        _assign(o, internal::copy_tag{});
         return *this;
       };
 
@@ -305,34 +305,34 @@ namespace voxory {
         ASSERT_ABORT(idx < size(), "heap_array index out of bounds");
 #endif // DEBUG_ITERATORS
 
-        return pair_.second_.first_[idx];
+        return _pair._second._first[idx];
       };
 
       const_reference operator[](size_t idx) const noexcept {
 #ifdef DEBUG
         ASSERT_ABORT(idx < size(), "heap_array index out of bounds");
 #endif // DEBUG_ITERATORS
-        return pair_.second_.first_[idx];
+        return _pair._second._first[idx];
       };
 
       NODISCARD CONSTEXPR pointer data() const noexcept {
-        return pair_.second_.first_;
+        return _pair._second._first;
       };
 
       NODISCARD CONSTEXPR size_type capacity() const noexcept {
-        return capacity_;
+        return _capacity;
       };
 
       NODISCARD CONSTEXPR allocator_type& get_allocator() noexcept {
-        return pair_.first();
+        return _pair.first();
       };
 
       NODISCARD CONSTEXPR const allocator_type& get_allocator() const noexcept {
-        return pair_.first();
+        return _pair.first();
       };
 
       NODISCARD CONSTEXPR size_type size() const noexcept {
-        return static_cast<size_type>(pair_.second_.last_ - pair_.second_.first_);
+        return static_cast<size_type>(_pair._second._last - _pair._second._first);
       };
 
       NODISCARD CONSTEXPR bool empty() const noexcept {
@@ -340,85 +340,85 @@ namespace voxory {
       };
 
       CONSTEXPR void clear() noexcept {
-        cleanup();
+        _cleanup();
       };
 
-      CONSTEXPR void resize(size_type size) noexcept(noexcept(resize_buffer(std::declval<size_type>()))) {
-        resize_buffer(size);
+      CONSTEXPR void resize(size_type size) noexcept(noexcept(_resize_buffer(std::declval<size_type>()))) {
+        _resize_buffer(size);
       };
 
-      CONSTEXPR void reserve(size_t size) noexcept(noexcept(reallocate(std::declval<size_type>()))) {
-        if (size > capacity_)
+      CONSTEXPR void reserve(size_t size) noexcept(noexcept(_reallocate(std::declval<size_type>()))) {
+        if (size > _capacity)
         {
-          reallocate(size);
+          _reallocate(size);
         }
       };
 
       NODISCARD CONSTEXPR reference at(size_t index) {
         if (index >= size()) throw std::out_of_range("index out of range");
-        return pair_.second_.first_[index];
+        return _pair._second._first[index];
       }
 
       NODISCARD CONSTEXPR const_reference at(size_t index) const {
         if (index >= size()) throw std::out_of_range("index out of range");
-        return pair_.second_.first_[index];
+        return _pair._second._first[index];
       }
 
       NODISCARD CONSTEXPR iterator begin() noexcept {
-        //return iterator(pair_.second_.first_);
-        return ITER_DEBUG_WRAP(iterator, pair_.second_.first_);
+        //return iterator(_pair._second._first);
+        return ITER_DEBUG_WRAP(iterator, _pair._second._first);
       };
 
       NODISCARD CONSTEXPR iterator end() noexcept {
-        return ITER_DEBUG_WRAP(iterator, pair_.second_.last_);
+        return ITER_DEBUG_WRAP(iterator, _pair._second._last);
       };
 
       NODISCARD CONSTEXPR const_iterator end() const noexcept {
-        return ITER_DEBUG_WRAP(const_iterator, pair_.second_.last_);
+        return ITER_DEBUG_WRAP(const_iterator, _pair._second._last);
       };
 
       NODISCARD CONSTEXPR const_iterator begin() const noexcept {
-        return ITER_DEBUG_WRAP(const_iterator, pair_.second_.first_);
+        return ITER_DEBUG_WRAP(const_iterator, _pair._second._first);
       };
 
       NODISCARD CONSTEXPR const_iterator cend() const noexcept {
-        return ITER_DEBUG_WRAP(const_iterator, pair_.second_.last_);
+        return ITER_DEBUG_WRAP(const_iterator, _pair._second._last);
       };
 
       NODISCARD CONSTEXPR const_iterator cbegin() const noexcept {
-        return ITER_DEBUG_WRAP(const_iterator, pair_.second_.first_);
+        return ITER_DEBUG_WRAP(const_iterator, _pair._second._first);
       };
 
       CONSTEXPR void shrink_to_fit() {
         size_type current_size = size();
-        if (current_size < capacity_) {
+        if (current_size < _capacity) {
           if (current_size == 0) {
-            cleanup();
+            _cleanup();
             return;
           }
-          reallocate(current_size);
+          _reallocate(current_size);
         }
       }
 
     private:
-      CONSTEXPR inline heap_array& steal_no_cleanup(heap_array& o) noexcept(
+      CONSTEXPR inline heap_array& _steal_no_cleanup(heap_array& o) noexcept(
 #ifdef DEBUG_ITERATORS
-        noexcept(move_proxies(std::declval<heap_array&>())) &&
+        noexcept(_move_proxies(std::declval<heap_array&>())) &&
 #endif // DEBUG_ITERATORS
         true) {
-        pair_.second_ = std::move(o.pair_.second_);
-        capacity_ = std::exchange(o.capacity_, 0);
+        _pair._second = std::move(o._pair._second);
+        _capacity = std::exchange(o._capacity, 0);
 #ifdef DEBUG_ITERATORS
-        move_proxies(o);
+        _move_proxies(o);
 #endif // DEBUG_ITERATORS
         return *this;
         };
 
-      CONSTEXPR void reallocate(size_type new_capacity) {
-        auto& data = pair_.second_;
+      CONSTEXPR void _reallocate(size_type new_capacity) {
+        auto& data = _pair._second;
         auto& alloc = get_allocator();
-        auto& first = data.first_;
-        auto& last = data.last_;
+        auto& first = data._first;
+        auto& last = data._last;
 
         pointer new_data = alloc.allocate(new_capacity);
         pointer new_last = new_data;
@@ -437,18 +437,18 @@ namespace voxory {
         }
         guard.release();
 
-        cleanup();
+        _cleanup();
 
         first = new_data;
         last = new_last;
-        capacity_ = new_capacity;
+        _capacity = new_capacity;
       };
 
-      CONSTEXPR void resize_reallocate(size_type new_capacity) {
-        auto& data = pair_.second_;
+      CONSTEXPR void _resize_reallocate(size_type new_capacity) {
+        auto& data = _pair._second;
         auto& alloc = get_allocator();
-        auto& first = data.first_;
-        auto& last = data.last_;
+        auto& first = data._first;
+        auto& last = data._last;
 
         pointer new_data = alloc.allocate(new_capacity);
         pointer new_last = new_data;
@@ -470,34 +470,34 @@ namespace voxory {
         new_last = internal::uninitialized_default_construct_n(new_last, to_construct, alloc);
         guard.release();
 
-        cleanup();
+        _cleanup();
 
         first = new_data;
         last = new_last;
-        capacity_ = new_capacity;
+        _capacity = new_capacity;
       };
 
-      CONSTEXPR void resize_buffer(size_type new_size) {
+      CONSTEXPR void _resize_buffer(size_type new_size) {
         size_type old_size = size();
         if (new_size == old_size) return;
 
-        auto& data = pair_.second_;
+        auto& data = _pair._second;
         auto& alloc = get_allocator();
-        auto& first = data.first_;
-        auto& last = data.last_;
+        auto& first = data._first;
+        auto& last = data._last;
 
 
-        if (new_size > capacity_) {
-          resize_reallocate(new_size);
+        if (new_size > _capacity) {
+          _resize_reallocate(new_size);
           return;
         }
         if (new_size < old_size) {
           size_type to_destroy = old_size - new_size;
           pointer new_last = last - to_destroy;
-          destroy_range(new_last, last);
+          _destroy_range(new_last, last);
           last = new_last;
 #ifdef DEBUG_ITERATORS
-          invalidate_range(first, last);
+          _invalidate_range(first, last);
 #endif // DEBUG_ITERATORS
         }
         else if (new_size > old_size) {
@@ -505,7 +505,7 @@ namespace voxory {
           pointer new_last = last + to_construct;
           last = internal::uninitialized_default_construct(last, new_last, alloc);
 #ifdef DEBUG_ITERATORS
-          invalidate_range(first, last);
+          _invalidate_range(first, last);
 #endif // DEBUG_ITERATORS
         }
         return;
@@ -513,11 +513,11 @@ namespace voxory {
 
       // tag to select between copy and move
       template<typename Tag>
-      CONSTEXPR void clean_and_create_buffer_src(size_type new_capacity, pointer src, size_type new_size, Tag&&) {
-        auto& data = pair_.second_;
+      CONSTEXPR void _clean_and_create_buffer_src(size_type new_capacity, pointer src, size_type new_size, Tag&&) {
+        auto& data = _pair._second;
         auto& alloc = get_allocator();
-        auto& first = data.first_;
-        auto& last = data.last_;
+        auto& first = data._first;
+        auto& last = data._last;
 
         pointer new_data = alloc.allocate(new_capacity);
         pointer new_last = new_data;
@@ -533,48 +533,48 @@ namespace voxory {
         }
         guard.release();
 
-        cleanup();
+        _cleanup();
 
         first = new_data;
         last = new_last;
-        capacity_ = new_capacity;
+        _capacity = new_capacity;
       };
 
-      CONSTEXPR void cleanup() noexcept(noexcept(deallocate_buffer())) {
-        auto& data = pair_.second_;
-        auto& first = data.first_;
-        auto& last = data.last_;
+      CONSTEXPR void _cleanup() noexcept(noexcept(_deallocate_buffer())) {
+        auto& data = _pair._second;
+        auto& first = data._first;
+        auto& last = data._last;
 #ifdef DEBUG_ITERATORS
-       release_proxy();
+       _release_proxy();
 #endif // DEBUG_ITERATORS
         if (first != nullptr)
         {
-          destroy_range(first, last);
-          deallocate_buffer();
+          _destroy_range(first, last);
+          _deallocate_buffer();
         }
       };
 
-      CONSTEXPR void allocate_buffer(size_t n) noexcept(noexcept(std::declval<allocator_type&>().allocate(std::declval<size_t>()))) {
+      CONSTEXPR void _allocate_buffer(size_t n) noexcept(noexcept(std::declval<allocator_type&>().allocate(std::declval<size_t>()))) {
         auto& alloc = get_allocator();
-        auto& data = pair_.second_;
+        auto& data = _pair._second;
         pointer new_data = alloc.allocate(n);
-        data.first_ = new_data;
-        data.last_ = new_data;
-        capacity_ = n;
+        data._first = new_data;
+        data._last = new_data;
+        _capacity = n;
       };
 
-      CONSTEXPR void deallocate_buffer() noexcept(noexcept(std::declval<allocator_type&>().deallocate(std::declval<pointer>(), std::declval<size_type>()))) {
+      CONSTEXPR void _deallocate_buffer() noexcept(noexcept(std::declval<allocator_type&>().deallocate(std::declval<pointer>(), std::declval<size_type>()))) {
         auto& alloc = get_allocator();
-        auto& data = pair_.second_;
-        auto& first = data.first_;
-        auto& last = data.last_;
-        alloc.deallocate(first, capacity_);
+        auto& data = _pair._second;
+        auto& first = data._first;
+        auto& last = data._last;
+        alloc.deallocate(first, _capacity);
         first = nullptr;
         last = nullptr;
-        capacity_ = 0;
+        _capacity = 0;
       };
 
-      CONSTEXPR void destroy_range(pointer first, pointer end) noexcept {
+      CONSTEXPR void _destroy_range(pointer first, pointer end) noexcept {
         if constexpr (!trivial_traits::is_trivially_destructible::value) {
           auto& alloc = get_allocator();
           for (; first < end; first++) {
@@ -589,20 +589,20 @@ namespace voxory {
       };
 
       template<typename... Args>
-      CONSTEXPR void construct_range(size_t count, Args&&... args) noexcept(detail::IsNoexceptConstructRange_v<pointer, allocator_type, Args...>) {
+      CONSTEXPR void _construct_range(size_t count, Args&&... args) noexcept(detail::IsNoexceptConstructRange_v<pointer, allocator_type, Args...>) {
         // sizeof...(Args) == 0 = default construct
         // sizeof...(Args) == 1 = fill_n with value
         // sizeof...(Args) == 2 = copy construct from src(start, end)
-        auto& data = pair_.second_;
+        auto& data = _pair._second;
         auto& alloc = get_allocator();
 
-        auto& first = data.first_;
-        auto& last = data.last_;
+        auto& first = data._first;
+        auto& last = data._last;
 
         constexpr uint8_t args_count = sizeof...(Args);
         if (count != 0)
         {
-          allocate_buffer(count);
+          _allocate_buffer(count);
           cleanup_guard guard(this);
           if constexpr (args_count == 0) {
             last = internal::uninitialized_default_construct_n(first, count, alloc);
@@ -618,27 +618,40 @@ namespace voxory {
       };
 
       template<typename Tag>
-      CONSTEXPR void assign(const heap_array& o, Tag&& tag) {
-        auto& data = pair_.second_;
+      CONSTEXPR void _assign(const heap_array& o, Tag&& tag) {
+        auto& data = _pair._second;
         auto& alloc = get_allocator();
 
-        auto& first = data.first_;
-        auto& last = data.last_;
+        auto& first = data._first;
+        auto& last = data._last;
 
-        auto& o_data = o.pair_.second_;
-        auto& o_first = o_data.first_;
+        auto& o_data = o._pair._second;
+        auto& o_first = o_data._first;
 
         size_type o_cap = o.capacity();
         size_type o_size = o.size();
         size_type size = static_cast<size_type>(last - first); // count of alive objects & default constructed 
-
+        
+        if (size == 0 || o_size == 0) {
+          if (o_size != 0) {
+            _clean_and_create_buffer_src(o_cap, o_first, o_size, tag);
+          }
+          else {
+            if (o_cap != _capacity)
+            {
+              _deallocate_buffer();
+              _allocate_buffer(o_cap);
+            }
+          }
+          return;
+        }
         // allocate new buffer, copy/move-construct all
-        if (o_size > capacity_) {
-          clean_and_create_buffer_src(o_cap, o_first, o_size, tag);
+        if (o_size > _capacity) {
+          _clean_and_create_buffer_src(o_cap, o_first, o_size, tag);
           return;
         }
 
-        // copy/move-assign within existing buffer, copy-construct rest
+        // copy/move-_assign within existing buffer, copy-construct rest
         if (o_size > size) {
           size_type common = size;
           size_type rest = o_size - size;
@@ -653,75 +666,75 @@ namespace voxory {
             last = mid;
           }
 #ifdef DEBUG_ITERATORS
-          invalidate_range(first, last);
+          _invalidate_range(first, last);
 #endif // DEBUG_ITERATORS
           return;
         }
-        // copy/move-assign within existing buffer, destroy rest
+        // copy/move-_assign within existing buffer, destroy rest
         else
         {
           size_type common = o_size;
           size_type rest = size - o_size;
           if constexpr (std::is_same_v<internal::copy_tag, Tag>) {
             pointer mid = internal::copy_assign_n(o_first, common, first, alloc);
-            destroy_range(mid, mid + rest);
+            _destroy_range(mid, mid + rest);
             last = mid;
           }
           else {
             pointer mid = internal::move_assign_n(o_first, common, first, alloc);
-            destroy_range(mid, mid + rest);
+            _destroy_range(mid, mid + rest);
             last = mid;
           }
 #ifdef DEBUG_ITERATORS
           if (rest != 0) {
-            invalidate_range(first, last);
+            _invalidate_range(first, last);
           }
 #endif // DEBUG_ITERATORS
           return;
         }
       }
 #ifdef DEBUG_ITERATORS
-      CONSTEXPR void invalidate_range(pointer first, pointer last) noexcept {
-        lock();
-        list::node_type* current = list_.data();
+      CONSTEXPR void _invalidate_range(pointer first, pointer last) noexcept {
+        _lock();
+        list::node_type* current = _list.data();
         while (current != nullptr)
         {
-          list::node_type* next = current->next_;
-          if (reinterpret_cast<const_iterator*>(current->data_)->ptr_ < first || reinterpret_cast<const_iterator*>(current->data_)->ptr_ > last)
+          list::node_type* next = current->_next;
+          if (reinterpret_cast<const_iterator*>(current->_data)->_ptr < first || reinterpret_cast<const_iterator*>(current->_data)->_ptr > last)
           {
-            current->data_->proxy_ = nullptr;
-            list_.pop_at(current);
+            current->_data->_proxy = nullptr;
+            _list.pop_at(current);
           }
           current = next;
         }
-        unlock();
+        _unlock();
       }
 #endif // DEBUG_ITERATORS
     protected:
-      struct storage {
-        storage(pointer first, pointer last) : first_(first), last_(last) {};
-        storage() : first_(nullptr), last_(nullptr) {};
-        storage(const storage& o) = delete;
-        storage(storage&& o) noexcept : first_(std::exchange(o.first_, nullptr)), last_(std::exchange(o.last_, nullptr)) {};
+      struct _storage {
+        _storage(pointer first, pointer last) : _first(first), _last(last) {};
+        _storage() : _first(nullptr), _last(nullptr) {};
+        _storage(const _storage& o) = delete;
+        _storage(_storage&& o) noexcept : _first(std::exchange(o._first, nullptr)), _last(std::exchange(o._last, nullptr)) {};
 
-        storage& operator=(const storage&) = delete;
-        storage& operator=(storage&& o) noexcept {
+        _storage& operator=(const _storage&) = delete;
+        _storage& operator=(_storage&& o) noexcept {
           if (this == std::addressof(o)) return *this;
-          first_ = std::exchange(o.first_, nullptr);
-          last_ = std::exchange(o.last_, nullptr);
+          _first = std::exchange(o._first, nullptr);
+          _last = std::exchange(o._last, nullptr);
           return *this;
         };
 
-        CONSTEXPR void swap(storage& o) noexcept {
-          first_ = std::exchange(o.first_, first_);
-          last_ = std::exchange(o.last_, last_);
+        CONSTEXPR void swap(_storage& o) noexcept {
+          _first = std::exchange(o._first, _first);
+          _last = std::exchange(o._last, _last);
         };
 
-        pointer first_;
-        pointer last_;
+        pointer _first;
+        pointer _last;
       };
-      utility::compressed_pair<allocator_type, storage> pair_;
-      size_type capacity_;
+      utility::compressed_pair<allocator_type, _storage> _pair;
+      size_type _capacity;
     };
   }
 }

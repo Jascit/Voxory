@@ -18,10 +18,11 @@ std::string format_time(long long nanoseconds) {
   int idx = 0;
 
   while (time > 10000 && idx < 4) { // якщо > 10000, переходимо до наступної одиниці
-    if (idx == 0)      time /= 1000;     // µs -> ms
-    else if (idx == 1) time /= 1000;     // ms -> s
-    else if (idx == 2) time /= 60;       // s -> min
-    else if (idx == 3) time /= 60;       // min -> h
+    if (idx == 0)      time /= 1000;     // ns -> us
+    else if (idx == 1) time /= 1000;     // us -> ms
+    else if (idx == 2) time /= 1000;     // ms -> s
+    else if (idx == 3) time /= 60;       // s -> min
+    else if (idx == 4) time /= 60;       // min -> h
     ++idx;
   }
 

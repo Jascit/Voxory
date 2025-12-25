@@ -439,13 +439,13 @@ NOYX_TEST(heap_array_test, non_trivial_lifetime_counts) {
   std::atomic<int> live{ 0 };
 
   struct Tracer {
-    std::atomic<int>* live_;
-    Tracer(std::atomic<int>* l = nullptr) noexcept : live_(l) { if (live_) live_->fetch_add(1); }
-    Tracer(const Tracer& o) noexcept : live_(o.live_) { if (live_) live_->fetch_add(1); }
-    Tracer(Tracer&& o) noexcept : live_(o.live_) { if (live_) live_->fetch_add(1); o.live_ = nullptr; }
+    std::atomic<int>* _live;
+    Tracer(std::atomic<int>* l = nullptr) noexcept : _live(l) { if (_live) _live->fetch_add(1); }
+    Tracer(const Tracer& o) noexcept : _live(o._live) { if (_live) _live->fetch_add(1); }
+    Tracer(Tracer&& o) noexcept : _live(o._live) { if (_live) _live->fetch_add(1); o._live = nullptr; }
     Tracer& operator=(const Tracer&) = default;
-    Tracer& operator=(Tracer&& o) noexcept { if (this != &o) { live_ = o.live_; o.live_ = nullptr; } return *this; }
-    ~Tracer() { if (live_) live_->fetch_sub(1); }
+    Tracer& operator=(Tracer&& o) noexcept { if (this != &o) { _live = o._live; o._live = nullptr; } return *this; }
+    ~Tracer() { if (_live) _live->fetch_sub(1); }
   };
 
   {
@@ -464,26 +464,26 @@ NOYX_TEST(heap_array_test, value_constructor_nontrivial) {
   std::atomic<int> moves{ 0 };
 
   struct Tracer2 {
-    std::atomic<int>* live_;
+    std::atomic<int>* _live;
     std::atomic<int>* copies_;
     std::atomic<int>* moves_;
     int payload;
     Tracer2(std::atomic<int>* l = nullptr, std::atomic<int>* c = nullptr, std::atomic<int>* m = nullptr, int p = 0) noexcept
-      : live_(l), copies_(c), moves_(m), payload(p) {
-      if (live_) live_->fetch_add(1);
+      : _live(l), copies_(c), moves_(m), payload(p) {
+      if (_live) _live->fetch_add(1);
     }
     Tracer2(const Tracer2& o) noexcept
-      : live_(o.live_), copies_(o.copies_), moves_(o.moves_), payload(o.payload) {
+      : _live(o._live), copies_(o.copies_), moves_(o.moves_), payload(o.payload) {
       if (copies_) copies_->fetch_add(1);
-      if (live_) live_->fetch_add(1);
+      if (_live) _live->fetch_add(1);
     }
     Tracer2(Tracer2&& o) noexcept
-      : live_(o.live_), copies_(o.copies_), moves_(o.moves_), payload(o.payload) {
+      : _live(o._live), copies_(o.copies_), moves_(o.moves_), payload(o.payload) {
       if (moves_) moves_->fetch_add(1);
-      if (live_) live_->fetch_add(1);
-      o.live_ = nullptr; o.copies_ = nullptr; o.moves_ = nullptr;
+      if (_live) _live->fetch_add(1);
+      o._live = nullptr; o.copies_ = nullptr; o.moves_ = nullptr;
     }
-    ~Tracer2() { if (live_) live_->fetch_sub(1); }
+    ~Tracer2() { if (_live) _live->fetch_sub(1); }
   };
 
   using heap_t = heap_array<Tracer2>;
@@ -498,12 +498,12 @@ NOYX_TEST(heap_array_test, resize_destroys_elements) {
   std::atomic<int> live{ 0 };
 
   struct R {
-    std::atomic<int>* live_;
+    std::atomic<int>* _live;
     int tag;
-    R(std::atomic<int>* l = nullptr, int t = 0) noexcept : live_(l), tag(t) { if (live_) live_->fetch_add(1); }
-    R(const R& o) noexcept : live_(o.live_), tag(o.tag) { if (live_) live_->fetch_add(1); }
-    R(R&& o) noexcept : live_(o.live_), tag(o.tag) { if (live_) live_->fetch_add(1); o.live_ = nullptr; }
-    ~R() { if (live_) live_->fetch_sub(1); }
+    R(std::atomic<int>* l = nullptr, int t = 0) noexcept : _live(l), tag(t) { if (_live) _live->fetch_add(1); }
+    R(const R& o) noexcept : _live(o._live), tag(o.tag) { if (_live) _live->fetch_add(1); }
+    R(R&& o) noexcept : _live(o._live), tag(o.tag) { if (_live) _live->fetch_add(1); o._live = nullptr; }
+    ~R() { if (_live) _live->fetch_sub(1); }
   };
 
   using heap_t = heap_array<R>;
@@ -543,12 +543,12 @@ NOYX_TEST(heap_array_test, swap_preserves_resources) {
   std::atomic<int> live{ 0 };
 
   struct Resource {
-    std::atomic<int>* live_;
+    std::atomic<int>* _live;
     int id;
-    Resource(std::atomic<int>* l = nullptr, int i = -1) noexcept : live_(l), id(i) { if (live_) live_->fetch_add(1); }
-    Resource(const Resource& o) noexcept : live_(o.live_), id(o.id) { if (live_) live_->fetch_add(1); }
-    Resource(Resource&& o) noexcept : live_(o.live_), id(o.id) { if (live_) live_->fetch_add(1); o.live_ = nullptr; }
-    ~Resource() { if (live_) live_->fetch_sub(1); }
+    Resource(std::atomic<int>* l = nullptr, int i = -1) noexcept : _live(l), id(i) { if (_live) _live->fetch_add(1); }
+    Resource(const Resource& o) noexcept : _live(o._live), id(o.id) { if (_live) _live->fetch_add(1); }
+    Resource(Resource&& o) noexcept : _live(o._live), id(o.id) { if (_live) _live->fetch_add(1); o._live = nullptr; }
+    ~Resource() { if (_live) _live->fetch_sub(1); }
   };
 
   using heap_t = heap_array<Resource>;
